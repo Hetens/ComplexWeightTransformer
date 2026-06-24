@@ -1,0 +1,38 @@
+# Python / uv
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# marimo
+__marimo__/
+
+# Results & data artifacts (keep dir, ignore contents)
+results/*
+!results/.gitkeep
+experiments/data/cache/
+*.pt
+*.ckpt
+
+# Weights & Biases (local run cache; sync to the cloud instead of committing)
+wandb/
+
+# LaTeX build artifacts (keep sources, ignore the build)
+paper/*.aux
+paper/*.bbl
+paper/*.blg
+paper/*.fdb_latexmk
+paper/*.fls
+paper/*.log
+paper/*.out
+paper/*.synctex.gz
+paper/*.toc
+paper/main.pdf
+
+# Claude Code local (machine-specific permissions etc.)
+.claude/settings.local.json
+
+# OS
+.DS_Store
