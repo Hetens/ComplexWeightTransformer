@@ -16,7 +16,7 @@ Plots follow the marimo theme (dark in dark mode) on screen; the Export cell alw
 import marimo
 
 __generated_with = "0.23.10"
-app = marimo.App(width="medium")
+app = marimo.App(width="medium",css_file ="./marimo.css")
 
 
 @app.cell
