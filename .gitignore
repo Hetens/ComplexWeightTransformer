@@ -9,9 +9,13 @@ __pycache__/
 # marimo
 __marimo__/
 
-# Results & data artifacts (keep dir, ignore contents)
+# Results & data artifacts (keep dir, ignore contents) — except sweep metrics, which are the
+# paper's evidence base: track result.json for unity_* runs (small JSON; checkpoints stay ignored)
 results/*
 !results/.gitkeep
+!results/unity_*/
+results/unity_*/*
+!results/unity_*/result.json
 experiments/data/cache/
 *.pt
 *.ckpt

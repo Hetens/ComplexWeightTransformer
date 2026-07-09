@@ -5,7 +5,7 @@
 #       confirm with `sinfo` and `module avail cuda` before the first real run.
 
 #SBATCH --job-name=cplxw
-#SBATCH --partition=gpu-preempt        # Unity preemptible GPU partition (cheap, may be requeued)
+#SBATCH --partition=gpu                # non-preempt: gpu-preempt only guarantees 2h before eviction
 #SBATCH --constraint=a100              # request an A100 node
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
@@ -16,9 +16,11 @@
 
 set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
+export PATH="$HOME/.local/bin:$PATH"   # uv lives here; batch shells may not source the login profile
 
-module purge
-module load cuda/12.4 || module load cuda || true   # match the cu124 wheel if available
+# `module` may be undefined in the batch shell; cu124 wheels bundle their CUDA runtime, so not fatal.
+module purge 2>/dev/null || true
+module load cuda/12.4 2>/dev/null || module load cuda 2>/dev/null || true
 
 echo "host=$(hostname) job=$SLURM_JOB_ID gpu=${CUDA_VISIBLE_DEVICES:-none}"
 uv sync --quiet
