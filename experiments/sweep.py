@@ -48,6 +48,10 @@ class SweepConfig:
     out_dir: str = "results"
     tag_prefix: str = "unity"         # keeps these results distinct from the local `rig_*` set
     skip_done: bool = True            # resumable: skip a run whose result.json already exists (preempt-safe)
+    # Ablation: complex+NoPE with learn_imag=False. The main complex condition bundles complex weights,
+    # CReLU, and a learnable imaginary token embedding; this isolates whether the reverse length-gen win
+    # comes from the complex weights themselves or from the learnable input phase.
+    ablate_learn_imag: bool = False
     # Weights & Biases
     wandb: bool = False
     wandb_project: str = "complexweights"
@@ -72,6 +76,8 @@ def conditions(cfg: SweepConfig):
     if cfg.matched_real_dim:
         c.append(("real", "none", cfg.matched_real_dim, cfg.lr_real, False, "_matched"))
         c.append(("real", "rope", cfg.matched_real_dim, cfg.lr_real, False, "_matched"))
+    if cfg.ablate_learn_imag:
+        c.append(("complex", "none", cfg.dim, cfg.lr_complex, False, "_noimag"))
     return c
 
 

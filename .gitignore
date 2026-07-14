@@ -11,11 +11,17 @@ __marimo__/
 
 # Results & data artifacts (keep dir, ignore contents) — except sweep metrics, which are the
 # paper's evidence base: track result.json for unity_* runs (small JSON; checkpoints stay ignored)
+# and the d160 probe metrics behind paper Table 2 (HTML figures stay ignored; regenerable on Unity)
 results/*
 !results/.gitkeep
 !results/unity_*/
 results/unity_*/*
 !results/unity_*/result.json
+!results/_figs/
+results/_figs/*
+!results/_figs/d160/
+results/_figs/d160/*
+!results/_figs/d160/phase_metrics.json
 experiments/data/cache/
 *.pt
 *.ckpt

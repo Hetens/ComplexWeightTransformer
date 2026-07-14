@@ -13,7 +13,8 @@
 #SBATCH --constraint=a100
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=48G
+#SBATCH --mem=10G              # host RAM; job 61568498 peaked ~4 GB on-GPU and less on-host.
+                               # If SLURM OOM-kills the job, raise back toward 48G and resubmit.
 #SBATCH --time=24:00:00
 #SBATCH --output=results/slurm-sweep-%j.out
 #SBATCH --requeue

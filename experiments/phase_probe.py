@@ -317,7 +317,24 @@ PROBE2_RUNS = {
     "R-RoPE": "probe2_reverse_real_rope_s0",
 }
 
-TAGSETS = {"d64": DEFAULT_RUNS, "d128": PROBE2_RUNS}
+# d160 / 5-layer / 10k-step set: the Unity 5-seed sweep checkpoints (unity_sweep.sbatch, job 61568498).
+# Reverse is the task where the behavioural gap actually lives at 5 seeds (complex+NoPE seq@24 = 0.86
+# vs 0.41 for the param-matched real baseline), so this is the decisive probe scale: converged models,
+# multiple seeds, plus the d224 param-matched real control. Checkpoints live on Unity (results/*/model.pt
+# is gitignored); run this probe there or pull the reverse checkpoints first.
+UNITY_D160_RUNS = {
+    "C-NoPE (s0)": "unity_reverse_complex_none_d160_s0",
+    "C-NoPE (s1)": "unity_reverse_complex_none_d160_s1",
+    "C-NoPE (s2)": "unity_reverse_complex_none_d160_s2",
+    "C-NoPE (no input phase)": "unity_reverse_complex_none_d160_noimag_s0",
+    "C-RoPE": "unity_reverse_complex_rope_d160_s0",
+    "R-NoPE": "unity_reverse_real_none_d160_s0",
+    "R-NoPE (d224 matched)": "unity_reverse_real_none_d224_matched_s0",
+    "R-RoPE": "unity_reverse_real_rope_d160_s0",
+    "R-RoPE (d224 matched)": "unity_reverse_real_rope_d224_matched_s0",
+}
+
+TAGSETS = {"d64": DEFAULT_RUNS, "d128": PROBE2_RUNS, "d160": UNITY_D160_RUNS}
 
 
 def build_probe_figures(results_dir: str = "results", runs: dict[str, str] | None = None,
@@ -419,7 +436,7 @@ if __name__ == "__main__":
     @dataclass
     class _Args:
         results_dir: str = "results"
-        tagset: str = "d64"  # which pre-registered run set: "d64" (default) or "d128" (probe2_*)
+        tagset: str = "d64"  # which run set: "d64" (default), "d128" (probe2_*), or "d160" (unity_*)
 
     a = tyro.cli(_Args)
     subdir = "" if a.tagset == "d64" else a.tagset

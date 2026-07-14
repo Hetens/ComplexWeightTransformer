@@ -31,13 +31,17 @@ def load_results(results_dir: str = "results") -> pd.DataFrame:
         c = d["config"]
         base = dict(
             tag=Path(f).parent.name, field=c["field"], pe=c["pe"], dim=c["dim"],
-            task=c["task"], seed=c["seed"], params=d["real_params"], final_loss=d["final_loss"],
+            task=c["task"], seed=c["seed"], learn_imag=bool(c.get("learn_imag", False)),
+            params=d["real_params"], final_loss=d["final_loss"],
         )
         for L, ev in d["evals"].items():
             rows.append({**base, "length": int(L), "token_acc": ev["token_acc"], "seq_acc": ev["seq_acc"]})
     df = pd.DataFrame(rows)
     if len(df):
         df["cond"] = df["field"] + "+" + df["pe"]
+        # learn_imag is part of the complex recipe; the ablation runs must not pool with the default
+        noimag = (df["field"] == "complex") & (~df["learn_imag"])
+        df.loc[noimag, "cond"] += "-noimag"
     return df
 
 
@@ -103,9 +107,10 @@ def stability_table(df: pd.DataFrame, length: int, threshold: float = 0.7) -> pd
     """Mean/median/min/max + success_rate (fraction of seeds above threshold) per condition.
 
     Mean alone is misleading for bimodal complex+NoPE; success_rate exposes how often it actually converges.
+    Grouped by dim as well as cond so the d160 and d224 (param-matched) real baselines never pool.
     """
     d = df[df.length == length]
-    g = d.groupby(["task", "cond"])["token_acc"]
+    g = d.groupby(["task", "cond", "dim"])["token_acc"]
     return (
         g.agg(
             mean="mean", median="median", min="min", max="max",
