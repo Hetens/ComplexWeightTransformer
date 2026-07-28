@@ -32,7 +32,15 @@ def load_results(results_dir: str = "results") -> pd.DataFrame:
         base = dict(
             tag=Path(f).parent.name, field=c["field"], pe=c["pe"], dim=c["dim"],
             task=c["task"], seed=c["seed"], learn_imag=bool(c.get("learn_imag", False)),
+            algebra=str(c.get("algebra", "complex")),  # pre-algebra runs predate the field
+            lr=c.get("lr", float("nan")),
             params=d["real_params"], final_loss=d["final_loss"],
+            # In-distribution convergence gate. Length generalization is only interpretable for a
+            # model that actually learned the task at the trained length; averaging a diverged run
+            # into a capability mean reports an optimization failure as a capability limit. The
+            # committed sweep passes this for all 160 runs, so it changes nothing there, but the
+            # wider real baselines do NOT all converge at the d160-tuned learning rate.
+            converged=bool(d["evals"].get(str(c["train_max"]), {}).get("token_acc", 0.0) >= 0.99),
         )
         for L, ev in d["evals"].items():
             rows.append({**base, "length": int(L), "token_acc": ev["token_acc"], "seq_acc": ev["seq_acc"]})
@@ -42,6 +50,9 @@ def load_results(results_dir: str = "results") -> pd.DataFrame:
         # learn_imag is part of the complex recipe; the ablation runs must not pool with the default
         noimag = (df["field"] == "complex") & (~df["learn_imag"])
         df.loc[noimag, "cond"] += "-noimag"
+        # likewise the weight-tying algebra: split/dual/diag are separate conditions, not complex
+        alg = (df["field"] == "complex") & (df["algebra"] != "complex")
+        df.loc[alg, "cond"] += "-" + df.loc[alg, "algebra"]
     return df
 
 

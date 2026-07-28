@@ -1,0 +1,64 @@
+{
+  "config": {
+    "task": "needle",
+    "n_symbols": 16,
+    "train_min": 6,
+    "train_max": 16,
+    "eval_lengths": [
+      256,
+      512,
+      1024
+    ],
+    "field": "complex",
+    "pe": "none",
+    "dim": 160,
+    "n_layers": 5,
+    "n_heads": 4,
+    "mlp_ratio": 4.0,
+    "complex_act": "crelu",
+    "learn_imag": true,
+    "max_T": 512,
+    "rope_base": 10000.0,
+    "steps": 10000,
+    "batch_size": 64,
+    "lr": 0.002,
+    "weight_decay": 0.01,
+    "grad_clip": 1.0,
+    "warmup": 200,
+    "seed": 3,
+    "device": "auto",
+    "eval_seqs": 512,
+    "out_dir": "results",
+    "tag": "unity_needle_complex_none_d160_s3_long",
+    "log_every": 200,
+    "smoke": false,
+    "save_model": true,
+    "wandb": true,
+    "wandb_project": "complexweights",
+    "wandb_entity": "",
+    "wandb_group": "unity-61568498",
+    "wandb_mode": "offline",
+    "eval_batch": 32
+  },
+  "real_params": 3085920,
+  "final_loss": 2.082435230477131e-06,
+  "history": [],
+  "evals": {
+    "256": {
+      "length": 256,
+      "token_acc": 0.79296875,
+      "seq_acc": 0.79296875
+    },
+    "512": {
+      "length": 512,
+      "token_acc": 0.705078125,
+      "seq_acc": 0.705078125
+    },
+    "1024": {
+      "length": 1024,
+      "token_acc": 0.498046875,
+      "seq_acc": 0.498046875
+    }
+  },
+  "reeval_of": "unity_needle_complex_none_d160_s3"
+}

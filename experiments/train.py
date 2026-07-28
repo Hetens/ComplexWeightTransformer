@@ -24,7 +24,7 @@ from experiments.data.tasks import TaskConfig, evaluate, make_batch
 @dataclass
 class TrainConfig:
     # task
-    task: str = "reverse"            # copy | reverse | sort
+    task: str = "reverse"            # copy | reverse | sort | revskip | skipcopy | needle
     n_symbols: int = 16
     train_min: int = 4
     train_max: int = 12
@@ -38,6 +38,7 @@ class TrainConfig:
     mlp_ratio: float = 4.0
     complex_act: str = "crelu"       # crelu | modrelu
     learn_imag: bool = False
+    algebra: str = "complex"         # complex only: complex | split | dual | diag
     max_T: int = 256
     rope_base: float = 10000.0
     # optim
@@ -51,6 +52,7 @@ class TrainConfig:
     seed: int = 0
     device: str = "auto"
     eval_seqs: int = 512
+    eval_batch: int = 256            # lower it for long-context evals: attention is O(batch * T^2)
     out_dir: str = "results"
     tag: str = ""
     log_every: int = 200
@@ -106,6 +108,7 @@ def run(cfg: TrainConfig) -> dict:
             vocab_size=task.vocab_size, dim=cfg.dim, n_layers=cfg.n_layers, n_heads=cfg.n_heads,
             mlp_ratio=cfg.mlp_ratio, field=cfg.field, pe=cfg.pe, max_T=cfg.max_T,
             rope_base=cfg.rope_base, learn_imag=cfg.learn_imag, complex_act=cfg.complex_act,
+            algebra=cfg.algebra,
         )
     ).to(dev)
 
@@ -138,7 +141,7 @@ def run(cfg: TrainConfig) -> dict:
             if wb is not None:
                 wb.log({"loss": float(loss.item()), "lr": sched.get_last_lr()[0]}, step=step)
 
-    evals = {str(L): evaluate(model, task, L, cfg.eval_seqs, dev) for L in cfg.eval_lengths}
+    evals = {str(L): evaluate(model, task, L, cfg.eval_seqs, dev, cfg.eval_batch) for L in cfg.eval_lengths}
     result = {
         "config": asdict(cfg),
         "real_params": model.num_real_params(),

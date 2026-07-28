@@ -6,11 +6,31 @@ Loss/accuracy are computed only on answer positions. Length generalization = tra
 
 Tasks:
   copy / reverse / sort  -- algorithmic; answer length == input length.
+  revskip / skipcopy     -- algorithmic, stride 2; answer length == ceil(input length / 2).
   needle                 -- passkey retrieval; a MARK token precedes a secret symbol placed at a random
                             depth in a haystack of fillers; answer is that one secret. Tests whether
                             position survives distance (RULER/passkey lineage). "length" = haystack size.
 
 Vocab: 0=PAD, 1=SEP, 2=MARK, content symbols start at 3.
+
+## The retrieval-offset law (why these five algorithmic tasks)
+
+With the layout [x_0..x_{L-1}] SEP [ans_0..ans_{A-1}] and the LM shift, answer token `ans_j` is
+predicted at input index `L + j`. So the attention offset a model must realise to fetch `ans_j` from
+its source index `src(j)` is `offset(j) = src(j) - (L + j)`:
+
+  | task     | src(j)     | offset(j) | anchored at | length-dependent? |
+  |----------|------------|-----------|-------------|-------------------|
+  | copy     | j          | -L        | start       | YES               |
+  | skipcopy | 2j         | j - L     | start       | YES               |
+  | reverse  | L-1-j      | -(2j+1)   | end         | no                |
+  | revskip  | L-1-2j     | -(3j+1)   | end         | no                |
+  | sort     | content    | n/a       | n/a         | n/a               |
+
+End-anchored tasks have an offset that is affine in the answer index `j` with *no dependence on L*, so
+they are solvable by a counter started at SEP. Start-anchored tasks need the model to measure `L`.
+`revskip` and `skipcopy` are the matched pair: same stride, same answer length, differing only in the
+anchor, hence only in length-dependence. See docs/hypothesis.md (H3_offset).
 """
 
 from __future__ import annotations
@@ -22,7 +42,7 @@ from torch import Tensor
 
 PAD, SEP, MARK = 0, 1, 2
 N_SPECIAL = 3
-ALGORITHMIC = ("copy", "reverse", "sort")
+ALGORITHMIC = ("copy", "reverse", "sort", "revskip", "skipcopy")
 TASKS = ALGORITHMIC + ("needle",)
 
 
@@ -40,12 +60,17 @@ class TaskConfig:
 
 
 def _answer(name: str, x: Tensor) -> Tensor:
+    """The target sequence for one algorithmic example. Answer length need not equal len(x)."""
     if name == "copy":
         return x.clone()
     if name == "reverse":
         return torch.flip(x, dims=[0])
     if name == "sort":
         return torch.sort(x).values
+    if name == "revskip":      # end-anchored stride 2: x[L-1], x[L-3], ...   offset -(3j+1)
+        return torch.flip(x, dims=[0])[::2].clone()
+    if name == "skipcopy":     # start-anchored stride 2: x[0], x[2], ...     offset j-L
+        return x[::2].clone()
     raise ValueError(f"unknown algorithmic task: {name}")
 
 
@@ -60,8 +85,9 @@ def _example(cfg: TaskConfig, L: int, gen: torch.Generator | None) -> tuple[Tens
         seq = torch.cat([inp, torch.tensor([SEP]), secret])
         return seq, 1
     x = torch.randint(lo, hi, (L,), generator=gen)
-    seq = torch.cat([x, torch.tensor([SEP]), _answer(cfg.name, x)])
-    return seq, L
+    ans = _answer(cfg.name, x)
+    seq = torch.cat([x, torch.tensor([SEP]), ans])
+    return seq, int(ans.numel())
 
 
 def make_batch(

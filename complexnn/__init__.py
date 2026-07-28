@@ -5,6 +5,7 @@ See ~/.claude/plans for the research plan and docs/ for the knowledge base.
 
 from .attention import ComplexSelfAttention, RealSelfAttention, apply_rope_real, build_rope_complex, build_rope_real
 from .layers import (
+    ALGEBRAS,
     ComplexLinear,
     ComplexRMSNorm,
     ModReLU,
@@ -19,6 +20,7 @@ from .models import ModelConfig, TransformerLM
 __version__ = "0.1.0"
 
 __all__ = [
+    "ALGEBRAS",
     "ComplexLinear",
     "ComplexRMSNorm",
     "ModReLU",

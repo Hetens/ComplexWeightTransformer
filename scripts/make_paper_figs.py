@@ -115,12 +115,227 @@ def fig_per_seed(df):
     return fig
 
 
+# ------------------------------------------------------------------ follow-up round (2026-07-26)
+ALG_LABEL = {
+    "complex+none": ("complex  [[A,-B],[B,A]]", "#2a78d6"),
+    "complex+none-split": ("split-complex  [[A,B],[B,A]]", "#7b5bd6"),
+    "complex+none-dual": ("dual  [[A,0],[B,A]]", "#c0499a"),
+    "complex+none-diag": ("block-diagonal  [[A,0],[0,B]]", "#d1495b"),
+}
+
+
+def fig_mechanism(df, L: int = 24):
+    """The two arms that ask *why* reverse wins, side by side.
+
+    Left: every two-channel tying at identical width (320) and identical parameters (3.09M), so any
+    spread is attributable to the sharing pattern alone. Right: the real quality-vs-width curve, which
+    asks whether an unconstrained real model can buy the same accuracy at any budget we swept.
+    """
+    d = df[(df.task == "reverse") & (df.length == L)]
+    algs = [(k, v) for k, v in ALG_LABEL.items() if len(d[(d.cond == k) & (d.dim == 160)])]
+    wide = sorted(x for x in d[d.cond == "real+none"].dim.unique())
+    if len(algs) < 2 and len(wide) < 3:
+        return None
+
+    fig, axes = plt.subplots(1, 2, figsize=(6.4, 2.6))
+    rng = np.random.default_rng(0)
+
+    ax = axes[0]
+    base = d[(d.cond == "real+none") & (d.dim == 224)].seq_acc.values
+    for i, (cond, (label, color)) in enumerate(algs):
+        v = d[(d.cond == cond) & (d.dim == 160)].seq_acc.values
+        y = len(algs) - 1 - i
+        ax.scatter(v, np.full_like(v, float(y)) + rng.uniform(-0.13, 0.13, len(v)), s=16,
+                   color=color, zorder=3, edgecolors="white", linewidths=0.5)
+        ax.scatter([v.mean()], [y], marker="|", s=140, color=INK, zorder=4, linewidths=1.2)
+    if len(base):
+        ax.axvline(base.mean(), color="#eda100", linewidth=1.2, linestyle=(0, (4, 2)), zorder=2)
+        # annotate in axis coords, anchored just right of the line, so it never collides with the
+        # title however many tying arms are present
+        ax.annotate("real+NoPE d224\n(param-matched)", xy=(base.mean(), -0.35),
+                    xycoords=("data", "axes fraction"), fontsize=6.2, color="#a87400",
+                    ha="center", va="bottom", annotation_clip=False)
+    ax.set_ylim(-0.6, len(algs) - 0.4)
+    ax.set_yticks(range(len(algs) - 1, -1, -1))
+    ax.set_yticklabels([lab for _, (lab, _) in algs], fontsize=6.8)
+    ax.set_xlim(-0.04, 1.04)
+    ax.set_xlabel(f"exact-match accuracy @ L={L}")
+    ax.set_title("weight tying (width and params fixed)", color=INK, fontweight="bold", fontsize=8)
+    _style_axis(ax)
+    ax.grid(axis="x", color=GRID, linewidth=0.5)
+    ax.grid(axis="y", visible=False)
+
+    ax = axes[1]
+    # Converged runs only, and the *best-tuned* learning rate per width, matching experiments/stats.py.
+    # Two separate traps live here: lr=2e-3 was tuned at d160 and diverges at the widest baselines, so
+    # plotting unconverged runs would draw an optimization failure as a capability curve; and pooling
+    # across learning rates would average a tuned baseline with an untuned one. A baseline is compared
+    # at its best, not at the rate that happens to flatter the method.
+    rw = d[(d.cond == "real+none") & d.converged]
+    counts = rw.groupby(["dim", "lr"]).size()
+    per_lr = (rw.groupby(["dim", "lr"])
+              .agg(acc=("seq_acc", "mean"), sd=("seq_acc", "std"), n=("seq_acc", "size"),
+                   params=("params", "mean")).reset_index())
+    g = (per_lr.sort_values("acc").groupby("dim", as_index=False).last().sort_values("params"))
+    ax.errorbar(g.params / 1e6, g.acc, yerr=g.sd.fillna(0), color="#eda100", marker="o",
+                markersize=3.2, linewidth=1.4, capsize=2, label="real+NoPE")
+    for r in g.itertuples():
+        ax.annotate(f"d{int(r.dim)}\nlr {r.lr:.0e}", (r.params / 1e6, r.acc), fontsize=5.5,
+                    color=MUTED, xytext=(0, -13), textcoords="offset points", ha="center")
+    # a width where every seed diverged at every rate tried would have no plottable point; mark it so
+    # the gap is not misread as missing data
+    allw = d[d.cond == "real+none"]
+    for dim in sorted(set(allw.dim.unique()) - set(g.dim)):
+        pr = allw[allw.dim == dim].params.mean() / 1e6
+        ax.annotate(f"d{int(dim)}\nno converged\nruns", (pr, 0.04), fontsize=5.5,
+                    color="#c0392b", ha="center", va="bottom")
+        ax.scatter([pr], [0.0], marker="x", s=22, color="#c0392b", zorder=4)
+    c = d[(d.cond == "complex+none") & (d.dim == 160)]
+    if len(c):
+        ax.axhline(c.seq_acc.mean(), color="#2a78d6", linewidth=1.3, zorder=2)
+        ax.text(g.params.max() / 1e6, c.seq_acc.mean() + 0.03, "complex+NoPE d160 (3.09M) ",
+                fontsize=6.2, color="#2a78d6", ha="right")
+    ax.set_ylim(-0.02, 1.05)
+    ax.set_xlabel("real parameters (M)")
+    ax.set_ylabel(f"exact-match accuracy @ L={L}")
+    ax.set_title("real width scan", color=INK, fontweight="bold", fontsize=8)
+    _style_axis(ax)
+    fig.tight_layout()
+    return fig
+
+
+def fig_offset_law(df):
+    """The offset law, as a matched pair.
+
+    `revskip` and `skipcopy` share stride and answer length and differ only in anchor, hence only in
+    whether the retrieval offset depends on input length. If length-independence is the operative
+    property, the complex-vs-real gap should open on revskip (end-anchored) and close on skipcopy
+    (start-anchored). `reverse` and `copy` are the already-measured members of the same family.
+    """
+    panels = [("reverse", "end-anchored\noffset $-(2j{+}1)$"), ("revskip", "end-anchored\noffset $-(3j{+}1)$"),
+              ("copy", "start-anchored\noffset $-L$"), ("skipcopy", "start-anchored\noffset $j{-}L$")]
+    panels = [(t, s) for t, s in panels if (df.task == t).any()]
+    if not any(t in ("revskip", "skipcopy") for t, _ in panels):
+        return None
+    fig, axes = plt.subplots(1, len(panels), figsize=(1.7 * len(panels) + 0.6, 2.6), sharey=True)
+    axes = np.atleast_1d(axes)
+    rng = np.random.default_rng(0)
+    arms = [("complex+none", 160, "#2a78d6", "complex+NoPE"),
+            ("real+none", 224, "#eda100", "real+NoPE d224")]
+    for ax, (task, sub) in zip(axes, panels):
+        d = df[(df.task == task) & (df.length == 24)]
+        for i, (cond, dim, color, label) in enumerate(arms):
+            v = d[(d.cond == cond) & (d.dim == dim)].seq_acc.values
+            if not len(v):
+                continue
+            ax.scatter(np.full(len(v), float(i)) + rng.uniform(-0.12, 0.12, len(v)), v, s=16,
+                       color=color, zorder=3, edgecolors="white", linewidths=0.5, label=label)
+            ax.scatter([i], [v.mean()], marker="_", s=200, color=INK, zorder=4, linewidths=1.3)
+        ax.set_xlim(-0.6, len(arms) - 0.4)
+        ax.set_xticks(range(len(arms)))
+        ax.set_xticklabels(["complex", "real d224"], fontsize=6.5)
+        ax.set_title(f"{task}\n{sub}", color=INK, fontweight="bold", fontsize=7.5)
+        ax.set_ylim(-0.02, 1.05)
+        _style_axis(ax)
+    axes[0].set_ylabel("exact-match accuracy @ L=24")
+    fig.tight_layout()
+    return fig
+
+
+def fig_needle_long(df):
+    """Needle retrieval out to 1024, from the committed checkpoints by inference alone."""
+    d = df[df.task == "needle"]
+    if not len(d[d.length > 128]):
+        return None
+    fig, ax = plt.subplots(figsize=(3.5, 2.5))
+    for (cond, dim), (label, color, dash) in SERIES.items():
+        g = (d[(d.cond == cond) & (d.dim == dim)]
+             .groupby("length")["seq_acc"].agg(["mean", "std"]).reset_index())
+        if not len(g) or g.length.max() <= 128:
+            continue
+        ax.plot(g.length, g["mean"], color=color, linestyle=dash, linewidth=1.4, marker="o",
+                markersize=2.6, label=label)
+        ax.fill_between(g.length, g["mean"] - g["std"].fillna(0), g["mean"] + g["std"].fillna(0),
+                        color=color, alpha=0.12, linewidth=0)
+    ax.axvline(TRAIN_MAX, color=BASE, linewidth=0.8, linestyle=(0, (2, 2)))
+    ax.set_xscale("log", base=2)
+    ax.set_xticks([16, 64, 128, 256, 512, 1024])
+    ax.set_xticklabels(["16", "64", "128", "256", "512", "1024"])
+    ax.minorticks_off()
+    ax.set_ylim(-0.02, 1.05)
+    ax.set_xlabel("haystack length")
+    ax.set_ylabel("retrieval accuracy")
+    ax.set_title("needle, re-evaluated to 1024", color=INK, fontweight="bold", fontsize=8)
+    _style_axis(ax)
+    ax.legend(frameon=False, fontsize=6.2, loc="lower left", labelcolor=INK2)
+    fig.tight_layout()
+    return fig
+
+
+def fig_probe_depth(metrics_path: Path, L: int = 24):
+    """Where the positional rotation survives: angle-fit R^2 against block depth, per run.
+
+    Every NoPE model builds the rotation in its early blocks; only the complex ones still have it at
+    the readout. The per-seed lines are kept rather than averaged because the real conditions split.
+    """
+    if not metrics_path.exists():
+        return None
+    import json
+    m = json.loads(metrics_path.read_text())
+    if not any(str(L) in per_len for per_len in m.values()):
+        return None
+    n_blocks = 0
+    fig, ax = plt.subplots(figsize=(3.5, 2.5))
+    for label, per_len in m.items():
+        if str(L) not in per_len:
+            continue
+        rp = per_len[str(L)]["rotating_plane"]
+        r2 = [rp[f"L{i}"]["r2"] for i in range(len(rp))]
+        n_blocks = max(n_blocks, len(r2))
+        # block-diagonal gets its own colour: it is in the complex *field* only as a container, and
+        # contains no complex arithmetic, so colouring it as complex would assert the thing the
+        # ablation disproved.
+        if "diag" in label:
+            color, style = "#d1495b", (0, (1, 1.5))
+        elif label.startswith("C-"):
+            color, style = "#2a78d6", "-"
+        else:
+            color, style = ("#eda100" if "d160" in label else "#b06a00"), (0, (4, 2))
+        ax.plot(range(len(r2)), r2, color=color, linewidth=1.3, marker="o", markersize=2.6,
+                alpha=0.85, linestyle=style)
+    ax.plot([], [], color="#2a78d6", linewidth=1.3, label="complex+NoPE")
+    ax.plot([], [], color="#d1495b", linewidth=1.3, linestyle=(0, (1, 1.5)), label="block-diagonal")
+    ax.plot([], [], color="#eda100", linewidth=1.3, linestyle=(0, (4, 2)), label="real+NoPE d160")
+    ax.plot([], [], color="#b06a00", linewidth=1.3, linestyle=(0, (4, 2)), label="real+NoPE d224")
+    ax.set_ylim(-0.03, 1.05)
+    ax.set_xticks(range(n_blocks))
+    ax.set_xlabel("residual stream at block input")
+    ax.set_ylabel("angle-fit $R^2$ vs position")
+    ax.set_title(f"positional rotation by depth (reverse, L={L})", color=INK, fontweight="bold",
+                 fontsize=8)
+    _style_axis(ax)
+    ax.legend(frameon=False, fontsize=6.2, loc="lower left", labelcolor=INK2)
+    fig.tight_layout()
+    return fig
+
+
 def main(results_dir: str = "results", out_dir: str = "paper/figs") -> None:
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     df = load_results(results_dir)
     df = df[df.tag.str.startswith("unity_")]
-    for name, fig in [("fig_acc_vs_length", fig_acc_vs_length(df)), ("fig_per_seed", fig_per_seed(df))]:
+    figs = [
+        ("fig_acc_vs_length", fig_acc_vs_length(df)),
+        ("fig_per_seed", fig_per_seed(df)),
+        ("fig_mechanism", fig_mechanism(df)),
+        ("fig_offset_law", fig_offset_law(df)),
+        ("fig_needle_long", fig_needle_long(df)),
+        ("fig_probe_depth", fig_probe_depth(Path(results_dir) / "_figs/act/activation_metrics.json")),
+    ]
+    for name, fig in figs:
+        if fig is None:
+            print(f"skip {name}: results not present yet")
+            continue
         fig.savefig(out / f"{name}.pdf")
         fig.savefig(out / f"{name}.png")
         print(f"wrote {out / name}.pdf/.png")

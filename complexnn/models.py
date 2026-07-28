@@ -15,7 +15,7 @@ import torch.nn.functional as F
 from torch import Tensor
 
 from .attention import ComplexSelfAttention, RealSelfAttention
-from .layers import ComplexLinear, ComplexRMSNorm, ModReLU, crelu, lift_to_complex, to_real_concat
+from .layers import ALGEBRAS, ComplexLinear, ComplexRMSNorm, ModReLU, crelu, lift_to_complex, to_real_concat
 
 __all__ = ["ModelConfig", "TransformerLM"]
 
@@ -34,6 +34,7 @@ class ModelConfig:
     rope_base: float = 10000.0
     learn_imag: bool = False   # complex only: learn the imaginary part of token embeddings
     complex_act: str = "crelu"  # crelu | modrelu  (CReLU trains far better; modReLU is near-linear post-RMSNorm)
+    algebra: str = "complex"   # complex only: complex | split | dual | diag (see complexnn.layers.ALGEBRAS)
 
 
 # ----------------------------------------------------------------- real stack
@@ -62,11 +63,11 @@ class _RealBlock(nn.Module):
 
 # ----------------------------------------------------------------- complex stack
 class _ComplexMLP(nn.Module):
-    def __init__(self, dim, hidden, act):
+    def __init__(self, dim, hidden, act, algebra="complex"):
         super().__init__()
-        self.fc1 = ComplexLinear(dim, hidden, bias=False)
+        self.fc1 = ComplexLinear(dim, hidden, bias=False, algebra=algebra)
         self.act = ModReLU(hidden) if act == "modrelu" else None
-        self.fc2 = ComplexLinear(hidden, dim, bias=False)
+        self.fc2 = ComplexLinear(hidden, dim, bias=False, algebra=algebra)
 
     def forward(self, z):
         h = self.fc1(z)
@@ -78,9 +79,10 @@ class _ComplexBlock(nn.Module):
     def __init__(self, cfg: ModelConfig):
         super().__init__()
         self.n1 = ComplexRMSNorm(cfg.dim)
-        self.attn = ComplexSelfAttention(cfg.dim, cfg.n_heads, cfg.causal, cfg.pe, cfg.max_T, cfg.rope_base)
+        self.attn = ComplexSelfAttention(cfg.dim, cfg.n_heads, cfg.causal, cfg.pe, cfg.max_T,
+                                         cfg.rope_base, cfg.algebra)
         self.n2 = ComplexRMSNorm(cfg.dim)
-        self.mlp = _ComplexMLP(cfg.dim, int(cfg.dim * cfg.mlp_ratio), cfg.complex_act)
+        self.mlp = _ComplexMLP(cfg.dim, int(cfg.dim * cfg.mlp_ratio), cfg.complex_act, cfg.algebra)
 
     def forward(self, z):
         z = z + self.attn(self.n1(z))
@@ -93,6 +95,7 @@ class TransformerLM(nn.Module):
         super().__init__()
         assert cfg.field in {"real", "complex"}
         assert cfg.pe in {"rope", "none", "learned"}
+        assert cfg.algebra in ALGEBRAS
         self.cfg = cfg
         self.tok = nn.Embedding(cfg.vocab_size, cfg.dim)
         self.pos = nn.Embedding(cfg.max_T, cfg.dim) if cfg.pe == "learned" else None

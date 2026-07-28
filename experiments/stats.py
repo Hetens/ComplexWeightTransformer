@@ -85,11 +85,18 @@ class Welch:
 
 
 def welch_t(a, b) -> Welch:
-    """Two-sided Welch t-test with exact Student-t p-value (Welch-Satterthwaite dof)."""
+    """Two-sided Welch t-test with exact Student-t p-value (Welch-Satterthwaite dof).
+
+    Returns NaNs rather than raising when either arm is empty, so a report that spans conditions
+    which do not all cover the same tasks degrades to a blank row instead of dying.
+    """
     a, b = pd.Series(a, dtype=float), pd.Series(b, dtype=float)
+    na, nb = len(a), len(b)
+    if na == 0 or nb == 0:
+        nan = float("nan")
+        return Welch(nan, nan, nan, nan, a.mean() if na else nan, b.mean() if nb else nan)
     ma, mb = a.mean(), b.mean()
     va, vb = a.var(ddof=1), b.var(ddof=1)
-    na, nb = len(a), len(b)
     se2 = va / na + vb / nb
     if se2 == 0:
         return Welch(ma - mb, float("inf") if ma != mb else 0.0, float(na + nb - 2),
@@ -114,11 +121,25 @@ def table_mean_std(df: pd.DataFrame, metric: str) -> pd.DataFrame:
     return s.unstack("length")
 
 
+# H1_cap was registered as a task-*averaged* test over exactly these four tasks. Later rounds add
+# tasks (revskip, skipcopy) that only ever ran the complex-vs-matched-real pair, so including them
+# would both crash on the missing d160 arm and, worse, silently redefine a pre-registered number.
+# Pinning the set keeps the registered verdict comparable across rounds.
+PREREG_TASKS = ("copy", "needle", "reverse", "sort")
+
+# Same hazard on a second axis. The condition key is (field+pe, dim) and does not mention the learning
+# rate, so once the follow-up rounds swept lr, those runs began pooling into the very conditions the
+# committed claims are stated over, shifting a pre-registered number by ~0.003 without any warning.
+# The committed sweep is entirely at 2e-3; the primary report is pinned to it and the lr grid is
+# reported only where it is the subject (followup_checks -> H2_width).
+CANONICAL_LR = 2e-3
+
+
 def preregistered_h1cap(df: pd.DataFrame, length: int, metric: str, baseline: str) -> list[str]:
     """H1_cap (docs/hypothesis.md): task-mean delta vs pooled seed std at the primary length point."""
     lines = []
     deltas, pooled = [], []
-    for task in sorted(df.task.unique()):
+    for task in [t for t in PREREG_TASKS if t in set(df.task.unique())]:
         a = df[(df.task == task) & (cond_key(df) == "complex+none_d160") & (df.length == length)][metric]
         b = df[(df.task == task) & (cond_key(df) == baseline) & (df.length == length)][metric]
         w = welch_t(a, b)
@@ -143,18 +164,119 @@ def claim_check(df: pd.DataFrame, task: str, a_key: str, b_key: str, length: int
             f"  delta={w.delta:+.3f}  t={w.t:.2f}  p={w.p:.4f}")
 
 
+def _best_lr(d: pd.DataFrame, **eq) -> tuple[float, pd.Series]:
+    """The (lr, seq_acc values) of the best-scoring learning rate for one condition, converged only.
+
+    Comparing a method at its tuned rate against a baseline at an untuned one is the easiest way to
+    manufacture a result, so every cross-condition comparison below picks each side's own best.
+    """
+    sel = d[d.converged]
+    for k, v in eq.items():
+        sel = sel[sel[k] == v]
+    cands = [(lr, sel[sel.lr == lr]["seq_acc"]) for lr in sorted(sel.lr.dropna().unique())]
+    cands = [(lr, v) for lr, v in cands if len(v) >= 3]
+    if not cands:
+        return float("nan"), pd.Series(dtype=float)
+    return max(cands, key=lambda t: t[1].mean())
+
+
+def followup_checks(full: pd.DataFrame) -> list[str]:
+    """The 2026-07-26 follow-up pre-registration (docs/hypothesis.md): H2_alg, H2_width, H3_offset,
+    H4_needle. Each block is emitted only if its runs are present, so this stays a no-op on the
+    original committed sweep.
+
+    Takes the *unfiltered* frame because H2_width's subject is the learning-rate grid, but every other
+    block is a statement about the committed recipe and so uses the canonical rate only. Mixing the
+    two silently shifts complex+NoPE from its 0.856 to a cross-lr pooled 0.838.
+    """
+    df = full[(full.lr == CANONICAL_LR) | full.lr.isna()]
+    keys = set(cond_key(df).unique())
+    lines: list[str] = []
+    p = lines.append
+
+    # H2_alg: is the reverse effect C, or structured weight sharing? All tyings share width+params.
+    algs = [(a, f"complex+none-{a}_d160") for a in ("split", "dual", "diag")]
+    if any(k in keys for _, k in algs):
+        p("\n## H2_alg: weight-tying algebra ablation on reverse (seq_acc @24)\n")
+        p("  (all arms: identical activation width 320 and identical 3.09M real params)")
+        for _, k in algs:
+            if k in keys:
+                p(claim_check(df, "reverse", "complex+none_d160", k, 24))
+        for _, k in algs:
+            if k in keys:
+                p(claim_check(df, "reverse", k, "real+none_d224", 24))
+
+    # H2_width: can real width buy the gap at all? The committed curve is flat from d160 to d224.
+    wide = [d for d in (320, 448, 640) if f"real+none_d{d}" in set(cond_key(full).unique())]
+    if wide:
+        rev = full[(full.task == "reverse") & (full.length == 24)]
+        p("\n## H2_width: real+NoPE width scan on reverse (seq_acc @24)\n")
+        p("  Two gates, both of which change the answer:")
+        p("   (a) converged only. lr=2e-3 was tuned at d160 and diverges at the widest baselines;")
+        p("       scoring an optimization failure as a capability limit would support H2_width.")
+        p("   (b) each arm at its OWN best lr over the same grid. Comparing a tuned method against")
+        p("       an untuned baseline is the easiest way to manufacture a result.")
+        c_lr, a = _best_lr(rev, cond="complex+none", dim=160)
+        p(f"\n  reference: complex+none_d160 best-tuned = {a.mean():.3f} +/- {a.std():.3f} "
+          f"at lr={c_lr:.0e} (3.09M params, width 320, n={len(a)})")
+        p("\n  full grid (converged/total, converged mean +/- std):")
+        rows = (rev[rev.cond.isin(["real+none", "complex+none"])]
+                .groupby(["cond", "dim", "lr"], as_index=False)
+                .agg(n=("seq_acc", "size"), params=("params", "mean")))
+        for r in rows.sort_values(["cond", "dim", "lr"]).itertuples():
+            ok = rev[rev.converged & (rev.cond == r.cond) & (rev.dim == r.dim)
+                     & (rev.lr == r.lr)]["seq_acc"]
+            mean = f"{ok.mean():.3f}" if len(ok) else "  nan"
+            sd = ok.std() if len(ok) > 1 else 0.0
+            p(f"    {r.cond:13s} d{int(r.dim):<4d} lr={r.lr:<7.0e} {r.params / 1e6:5.2f}M  "
+              f"{len(ok)}/{r.n}  {mean} +/- {sd:.3f}")
+        p("\n  best-tuned real per width vs best-tuned complex:")
+        for dim in sorted(rev[rev.cond == "real+none"].dim.unique()):
+            lr, b = _best_lr(rev, cond="real+none", dim=dim)
+            if not len(b):
+                p(f"    d{int(dim):<4d}: no learning rate produced 3+ converged seeds")
+                continue
+            w = welch_t(a, b)
+            par = rev[(rev.cond == "real+none") & (rev.dim == dim)]["params"].mean()
+            p(f"    d{int(dim):<4d} {par / 1e6:5.2f}M ({par / 3085920:4.1f}x)  lr={lr:.0e}  "
+              f"{b.mean():.3f} +/- {b.std():.3f} (n={len(b)})  delta={w.delta:+.3f}  p={w.p:.4f}")
+
+    # H3_offset: complex should win the end-anchored task and not the start-anchored one.
+    for task, kind in (("revskip", "end-anchored, offset -(3j+1), length-INdependent"),
+                       ("skipcopy", "start-anchored, offset j-L, length-dependent")):
+        if (df.task == task).any():
+            p(f"\n## H3_offset: {task} ({kind}), seq_acc\n")
+            for L in (24, 32):
+                if ((df.task == task) & (df.length == L)).any():
+                    p(claim_check(df, task, "complex+none_d160", "real+none_d224", L))
+
+    # H4_needle: pushed on the length axis rather than the seed axis (experiments/reeval.py).
+    long_lengths = [L for L in (256, 512, 1024) if ((df.task == "needle") & (df.length == L)).any()]
+    if long_lengths:
+        p("\n## H4_needle: re-eval at long haystacks (seq_acc), inference only\n")
+        for L in long_lengths:
+            p(claim_check(df, "needle", "complex+none-noimag_d160", "real+none_d224", L))
+            p(claim_check(df, "needle", "complex+none_d160", "real+none_d224", L))
+    return lines
+
+
 def main(results_dir: str = "results", tag_prefix: str = "unity_", train_max: int = 16,
          out_md: str = "") -> None:
-    df = load_results(results_dir)
-    df = df[df.tag.str.startswith(tag_prefix)]
-    if not len(df):
+    full = load_results(results_dir)
+    full = full[full.tag.str.startswith(tag_prefix)]
+    if not len(full):
         raise SystemExit(f"no results matching {tag_prefix}* under {results_dir}/")
+    # Everything above the follow-up section is a statement about the committed recipe, so it must see
+    # only the canonical learning rate. followup_checks gets `full` because the lr grid is its subject.
+    df = full[(full.lr == CANONICAL_LR) | full.lr.isna()]
     two_l = 2 * train_max
     out: list[str] = []
     p = out.append
 
     n_runs = df.tag.nunique()
-    p(f"{n_runs} runs | tasks={sorted(df.task.unique())} | conditions={sorted(cond_key(df).unique())}")
+    p(f"{full.tag.nunique()} runs total; {n_runs} at the canonical lr={CANONICAL_LR:g} "
+      f"(the rest are the follow-up lr grid, reported under H2_width)")
+    p(f"tasks={sorted(df.task.unique())} | conditions={sorted(cond_key(df).unique())}")
 
     for metric in ("seq_acc", "token_acc"):
         p(f"\n## mean±std {metric} by eval length (seeds pooled per condition)\n")
@@ -187,6 +309,8 @@ def main(results_dir: str = "results", tag_prefix: str = "unity_", train_max: in
         p("  -- learn_imag ablation, needle side-observation: noimag is (in)distinguishable? --")
         p(claim_check(df, "needle", "complex+none-noimag_d160", "complex+none_d160", 128))
         p(claim_check(df, "needle", "complex+none-noimag_d160", "real+none_d224", 128))
+
+    out.extend(followup_checks(full))
 
     text = "\n".join(out)
     print(text)

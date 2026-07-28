@@ -3,39 +3,67 @@
 **Can complex-valued transformer weights infer the `cos + i·sin` structure of RoPE, removing the need
 for an explicit positional module?**
 
-**Answer: no.** The mechanism is falsified at three scales, and the parameter-savings story does not
-survive capacity matching. What does survive, at 5 seeds and under both capacity controls, is one
-specific capability: complex weights roughly **double exact-match length generalization on order
-reversal**, and an ablation attributes the effect to the complex weights themselves.
+**Answer: no**, and the one effect that survived that answer turns out not to be about complex numbers
+either. Two rounds, 270 runs. The mechanism is falsified at three scales and again in the activations.
+One behavioral effect survived round one (complex+NoPE roughly doubles exact-match length
+generalization on order reversal); round two then showed it is **not a property of `ℂ`** (a
+block-diagonal control with no complex arithmetic reproduces it) and **not out of reach of real
+width** (a tuned real model matches it at ~4x the parameters). What remains is a
+**parameter-efficiency** result on one task out of six.
 
-## Results (Unity 5-seed sweep + ablation, 160/160 runs converged)
+## Results (270 runs: 160-run sweep + ablation, plus a 110-run follow-up)
 
-Exact-match sequence accuracy past the trained length (train lengths 6-16), mean ± std over 5 seeds:
-complex+NoPE (d160) vs a parameter-matched real+NoPE (d224). Full log and claim-by-claim verdicts in
-[`docs/results.md`](docs/results.md); every number reproduces from the committed
-`results/unity_*/result.json` via `uv run python -m experiments.stats`.
+Exact-match sequence accuracy past the trained length (train lengths 6-16), mean ± std over 5 seeds.
+Full log and claim-by-claim verdicts in [`docs/results.md`](docs/results.md); every number reproduces
+from the committed `results/unity_*/result.json` via `uv run python -m experiments.stats`.
+
+**Round one, complex+NoPE (d160) vs a parameter-matched real+NoPE (d224):**
 
 | task | eval length | complex+NoPE | real+NoPE (param-matched) | p (Welch) | verdict |
 |---|---|---|---|---|---|
-| **reverse** | 24 (1.5x train) | **0.86 ± 0.02** | 0.41 ± 0.08 | **0.0002** | real win; survives equal-dim and equal-param controls |
+| **reverse** | 24 (1.5x train) | **0.86 ± 0.02** | 0.41 ± 0.08 | **0.0002** | the one surviving effect; see round two for what it is |
 | copy | 32 | 0.37 ± 0.27 | 0.39 ± 0.36 | 0.92 | parity (extrapolation is bimodal across seeds in every NoPE condition) |
 | sort | 96 | 0.27 ± 0.19 | 0.25 ± 0.28 | 0.90 | parity; the pilot's "10x sort" was n=1 seed noise |
 | needle | 128 | 0.85 ± 0.28 | 0.92 ± 0.18 | 0.67 | parity; the pilot gap was a capacity artifact |
 
-- **Mechanism: falsified.** Trained complex QK weights show no RoPE-like phase structure at three
-  scales (d64, d128, and the d160 sweep checkpoints themselves); entry-phase and eigenvalue-angle
-  spectra are statistically indistinguishable from the random init even when the task is fully solved.
-- **The reverse win is the complex weights themselves.** Removing the learnable input phase (the only
-  other complex-specific ingredient besides CReLU) leaves reverse unchanged (0.84 ± 0.06 vs 0.86 ± 0.02,
-  p = 0.68) and still beats the param-matched baseline by the full margin; on needle the ablated model
-  is at ceiling (1.00 ± 0.01 through length 128) with near-zero seed variance.
-- **"Complex enhances RoPE" also died under param matching:** needle seq@128 is 0.45 ± 0.14 for
-  complex+RoPE vs 0.57 ± 0.08 for param-matched real+RoPE, in real's favor.
-- **No compression story:** complex costs ~2x parameters at equal dim and buys nothing at matched
-  parameters outside reverse.
-- **Training recipe:** CReLU is the piece that matters; all 160 runs at d160/10k steps converged
-  in-distribution, with or without the learnable input phase. Every RoPE and learned-PE run collapses
-  to 0 exact-match past the trained length, matching the literature ordering (NoPE extrapolates best).
+**Round two, what the reverse effect actually is.** All four tyings below have *identical* parameter
+count (3,085,920) and *identical* activation width (320); only the weight-sharing pattern differs:
+
+| tying on reverse @24 | algebra | seq@24 | vs complex |
+|---|---|---|---|
+| `[[A,-B],[B,A]]` | complex, `i²=-1` | 0.856 ± 0.018 | reference |
+| `[[A,B],[B,A]]` | split-complex, `j²=+1` | 0.846 ± 0.05 | p = 0.70 |
+| `[[A,0],[0,B]]` | **none (no mixing at all)** | 0.830 ± 0.05 | p = 0.31 |
+| `[[A,0],[B,A]]` | dual, `ε²=0` | 0.754 ± 0.08 | p = 0.044 |
+
+and a real+NoPE width scan, both arms tuned over the same learning-rate grid, converged runs only:
+
+| real width | params | x complex | seq@24 | vs complex |
+|---|---|---|---|---|
+| d224 (matched) | 3.02M | 1.0x | 0.407 ± 0.085 | +0.450, p = 0.0002 |
+| d448 | 12.06M | 3.9x | 0.811 ± 0.090 | +0.045, p = 0.33 |
+| d640 | 24.61M | 8.0x | **0.868 ± 0.040** | -0.012, p = 0.57 |
+
+- **Mechanism: falsified, twice.** Trained complex QK weights show no RoPE-like phase structure at
+  three scales. Probing the *activations* instead finds every NoPE model builds a positional rotation,
+  but it encodes **fractional** position (total swept angle invariant across a 3x length range), so
+  there is no fixed rotation for weights to store. Two further pre-registered mechanistic predictions
+  failed, one of them backwards: the parameter-matched real models own *cleaner* attention staircases
+  than the complex models that outscore them.
+- **The reverse win is not the complex weights.** A block-diagonal control with no complex arithmetic
+  and no cross-stream mixing reproduces it (p = 0.31). The `learn_imag` ablation had already ruled out
+  the input phase; the algebra ablation rules out `ℂ` itself.
+- **It is also not unreachable by real width.** The real curve is flat only over d160-d224, the two
+  widths round one happened to sample, then rises to 0.87. Round one's 0.41 is what a real transformer
+  does *at matched parameters*, not what it can do.
+- **A compression story, partially reinstated.** On reverse only, a two-stream tying reaches at 3.09M
+  what an unconstrained real model needs ~12M to match. Round one recorded H1_comp as not supported
+  from the d224 point alone; that was correct on its evidence and under-powered on the parameter axis.
+- **The tying buys consistency as much as accuracy:** complex ± 0.018 against ± 0.090-0.234 for the
+  wide real baselines, which is why the significance boundary (2x) and the point-estimate crossover
+  (4x) disagree.
+- **Training recipe:** CReLU is the piece that matters; the d160-tuned lr does *not* transfer up the
+  width axis (real d640 fails to train at all at 2e-3 and reaches 0.87 at 5e-4).
 
 ## What this is
 
@@ -62,14 +90,29 @@ uv run marimo edit notebooks/03_analysis.py                                     
 sbatch scripts/unity_sweep.sbatch                                              # full run on a Unity A100
 ```
 
+Round two (all default off, so the commands above reproduce round one unchanged):
+
+```bash
+# weight-tying ablation: same width, same params, only the sharing pattern changes
+uv run python -m experiments.sweep --tasks reverse --core none --algebras split dual diag
+# real width scan, and the lower learning rates the widest baselines need to train at all
+uv run python -m experiments.sweep --tasks reverse --core none --real-width-scan 320 448 640
+uv run python -m experiments.sweep --tasks reverse --core none --real-width-scan 448 640 \
+    --lr-real 5e-4 --tag-note lr5e4
+# offset-law tasks; re-score committed checkpoints at longer haystacks; activation-level probe
+uv run python -m experiments.sweep --tasks revskip skipcopy --core pair
+uv run python -m experiments.reeval --match "unity_needle_*_none_*" --lengths 256 512 1024
+uv run python -m experiments.activation_probe --lengths 16 24 48
+```
+
 ## Layout
 
 | Path | Purpose |
 |---|---|
 | `complexnn/` | reusable complex-valued layers, attention, models, init; real PE baselines |
-| `experiments/` | configs (tyro), data generators, `train.py`, `eval.py`, `stats.py` |
+| `experiments/` | configs (tyro), data generators, `train.py`, `sweep.py`, `stats.py`, `reeval.py` (re-score committed checkpoints at new lengths), `phase_probe.py` (weight-level), `activation_probe.py` (residual-stream level) |
 | `notebooks/` | marimo + plotly analysis dashboards |
-| `scripts/` | `smoke_test.sh` (local GTX 1050), Unity A100 / SLURM sbatch scripts |
+| `scripts/` | `smoke_test.sh` (local GTX 1050), Unity SLURM sbatch scripts: `unity_sweep` / `unity_ablation` (round one), `unity_followup` / `unity_width_lr` / `unity_complex_lr` (round two) |
 | `docs/` | persistent knowledge base + results writeup |
 | `results/` | sweep metric JSONs and probe metrics (committed); checkpoints/figures gitignored |
 | `paper/` | NeurIPS-style writeup (`main.tex`), figures via `scripts/make_paper_figs.py` |

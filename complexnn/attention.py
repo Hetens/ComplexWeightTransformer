@@ -103,14 +103,17 @@ class RealSelfAttention(nn.Module):
 
 
 class ComplexSelfAttention(nn.Module):
-    def __init__(self, dim, n_heads, causal=True, pe="none", max_T=2048, rope_base=10000.0):
+    def __init__(self, dim, n_heads, causal=True, pe="none", max_T=2048, rope_base=10000.0,
+                 algebra="complex"):
         super().__init__()
         assert dim % n_heads == 0
+        assert not (pe == "rope" and algebra != "complex"), \
+            "the RoPE phasor multiply is only defined for algebra='complex'"
         self.n_heads, self.head_dim, self.causal, self.pe = n_heads, dim // n_heads, causal, pe
-        self.q = ComplexLinear(dim, dim, bias=False)
-        self.k = ComplexLinear(dim, dim, bias=False)
-        self.v = ComplexLinear(dim, dim, bias=False)
-        self.proj = ComplexLinear(dim, dim, bias=False)
+        self.q = ComplexLinear(dim, dim, bias=False, algebra=algebra)
+        self.k = ComplexLinear(dim, dim, bias=False, algebra=algebra)
+        self.v = ComplexLinear(dim, dim, bias=False, algebra=algebra)
+        self.proj = ComplexLinear(dim, dim, bias=False, algebra=algebra)
         if pe == "rope":
             rot = build_rope_complex(max_T, self.head_dim, rope_base)
             self.register_buffer("rope_rot", rot, persistent=False)
