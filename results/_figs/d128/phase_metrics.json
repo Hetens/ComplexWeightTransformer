@@ -1,0 +1,179 @@
+{
+  "init (Trabelsi null)": {
+    "acc": null,
+    "all_entries": {
+      "n": 131072,
+      "resultant_R": 0.0029,
+      "circular_var": 0.9971,
+      "rayleigh_p": 0.32579452384773866,
+      "ks_stat": 0.0034,
+      "ks_p": 0.09321194805182234,
+      "kuiper_V": 0.004,
+      "kuiper_p": 0.22203017002580736
+    },
+    "top25pct_magnitude": {
+      "n": 32768,
+      "resultant_R": 0.004,
+      "circular_var": 0.996,
+      "rayleigh_p": 0.5843323519036786,
+      "ks_stat": 0.005,
+      "ks_p": 0.39558686974464763,
+      "kuiper_V": 0.0059,
+      "kuiper_p": 0.7253414408133726
+    },
+    "eigen_angles": {
+      "n": 1024,
+      "resultant_R": 0.0054,
+      "circular_var": 0.9946,
+      "rayleigh_p": 0.9703569343905946,
+      "ks_stat": 0.0109,
+      "ks_p": 0.9997115870918675,
+      "kuiper_V": 0.0164,
+      "kuiper_p": 0.9999966778943662
+    },
+    "eigen_abs_mean": 0.6667,
+    "eigen_abs_max": 1.0575,
+    "eigen_frac_near_unit": 0.1973
+  },
+  "C-NoPE (s0)": {
+    "acc": 0.9998779296875,
+    "all_entries": {
+      "n": 131072,
+      "resultant_R": 0.0037,
+      "circular_var": 0.9963,
+      "rayleigh_p": 0.17035133296452992,
+      "ks_stat": 0.0037,
+      "ks_p": 0.05830002560319453,
+      "kuiper_V": 0.0042,
+      "kuiper_p": 0.15229879146449973
+    },
+    "top25pct_magnitude": {
+      "n": 32768,
+      "resultant_R": 0.0029,
+      "circular_var": 0.9971,
+      "rayleigh_p": 0.758801099371071,
+      "ks_stat": 0.0034,
+      "ks_p": 0.8526745131712767,
+      "kuiper_V": 0.0044,
+      "kuiper_p": 0.9785790484205531
+    },
+    "eigen_angles": {
+      "n": 1024,
+      "resultant_R": 0.0008,
+      "circular_var": 0.9992,
+      "rayleigh_p": 0.9993551521111413,
+      "ks_stat": 0.0134,
+      "ks_p": 0.9922831386053391,
+      "kuiper_V": 0.0191,
+      "kuiper_p": 0.9997744268999526
+    },
+    "eigen_abs_mean": 0.7375,
+    "eigen_abs_max": 1.8657,
+    "eigen_frac_near_unit": 0.1133,
+    "attention": {
+      "pos_fraction": 0.3946,
+      "rel_fraction": 0.2341,
+      "noise_floor": 0.0039
+    }
+  },
+  "C-NoPE (s2)": {
+    "acc": 0.999755859375,
+    "all_entries": {
+      "n": 131072,
+      "resultant_R": 0.0032,
+      "circular_var": 0.9968,
+      "rayleigh_p": 0.25683118374573183,
+      "ks_stat": 0.0025,
+      "ks_p": 0.4000741753500585,
+      "kuiper_V": 0.0036,
+      "kuiper_p": 0.3665399190848927
+    },
+    "top25pct_magnitude": {
+      "n": 32768,
+      "resultant_R": 0.0058,
+      "circular_var": 0.9942,
+      "rayleigh_p": 0.3297944932294105,
+      "ks_stat": 0.0061,
+      "ks_p": 0.1736541560211101,
+      "kuiper_V": 0.0072,
+      "kuiper_p": 0.3797554942062275
+    },
+    "eigen_angles": {
+      "n": 1024,
+      "resultant_R": 0.0038,
+      "circular_var": 0.9962,
+      "rayleigh_p": 0.9850445342541413,
+      "ks_stat": 0.0106,
+      "ks_p": 0.9998100201691784,
+      "kuiper_V": 0.0185,
+      "kuiper_p": 0.9998904009456385
+    },
+    "eigen_abs_mean": 0.7524,
+    "eigen_abs_max": 2.0252,
+    "eigen_frac_near_unit": 0.1299,
+    "attention": {
+      "pos_fraction": 0.4373,
+      "rel_fraction": 0.2219,
+      "noise_floor": 0.0039
+    }
+  },
+  "C-RoPE": {
+    "acc": 1.0,
+    "all_entries": {
+      "n": 131072,
+      "resultant_R": 0.0036,
+      "circular_var": 0.9964,
+      "rayleigh_p": 0.17743583768005913,
+      "ks_stat": 0.0032,
+      "ks_p": 0.13308140546946406,
+      "kuiper_V": 0.0042,
+      "kuiper_p": 0.17386648360353302
+    },
+    "top25pct_magnitude": {
+      "n": 32768,
+      "resultant_R": 0.0049,
+      "circular_var": 0.9951,
+      "rayleigh_p": 0.45551715728326175,
+      "ks_stat": 0.0048,
+      "ks_p": 0.4245378437397417,
+      "kuiper_V": 0.0058,
+      "kuiper_p": 0.7556273972200507
+    },
+    "eigen_angles": {
+      "n": 1024,
+      "resultant_R": 0.003,
+      "circular_var": 0.997,
+      "rayleigh_p": 0.9908574206060613,
+      "ks_stat": 0.0085,
+      "ks_p": 0.9999993403648523,
+      "kuiper_V": 0.0167,
+      "kuiper_p": 0.999993718989435
+    },
+    "eigen_abs_mean": 0.6609,
+    "eigen_abs_max": 1.3062,
+    "eigen_frac_near_unit": 0.1592,
+    "attention": {
+      "pos_fraction": 0.6733,
+      "rel_fraction": 0.3366,
+      "noise_floor": 0.0039
+    }
+  },
+  "R-NoPE": {
+    "acc": 0.9998779296875,
+    "field": "real",
+    "attention": {
+      "pos_fraction": 0.4297,
+      "rel_fraction": 0.1905,
+      "noise_floor": 0.0039
+    }
+  },
+  "R-RoPE": {
+    "acc": 1.0,
+    "field": "real",
+    "attention": {
+      "pos_fraction": 0.5456,
+      "rel_fraction": 0.3265,
+      "noise_floor": 0.0039
+    }
+  }
+}

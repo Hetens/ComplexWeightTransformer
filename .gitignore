@@ -25,12 +25,27 @@ results/local_*/*
 !results/local_*/result.json
 !results/_figs/
 results/_figs/*
+!results/_figs/d64/
+results/_figs/d64/*
+!results/_figs/d64/phase_metrics.json
+!results/_figs/d128/
+results/_figs/d128/*
+!results/_figs/d128/phase_metrics.json
 !results/_figs/d160/
 results/_figs/d160/*
 !results/_figs/d160/phase_metrics.json
 !results/_figs/act/
 results/_figs/act/*
 !results/_figs/act/activation_metrics.json
+# the d64 (2-layer) and d128 (4-layer) probe runs: same rule as unity_*, metrics tracked and
+# checkpoints ignored. These two scales were reported as unreproducible in an earlier draft; the
+# runs were recovered, so all three probe scales now regenerate from the committed files.
+!results/probe_*/
+results/probe_*/*
+!results/probe_*/result.json
+!results/probe2_*/
+results/probe2_*/*
+!results/probe2_*/result.json
 experiments/data/cache/
 *.pt
 *.ckpt

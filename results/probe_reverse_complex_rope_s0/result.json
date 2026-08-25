@@ -1,0 +1,103 @@
+{
+  "config": {
+    "task": "reverse",
+    "n_symbols": 16,
+    "train_min": 4,
+    "train_max": 12,
+    "eval_lengths": [
+      12,
+      24,
+      48
+    ],
+    "field": "complex",
+    "pe": "rope",
+    "dim": 64,
+    "n_layers": 2,
+    "n_heads": 4,
+    "mlp_ratio": 4.0,
+    "complex_act": "crelu",
+    "learn_imag": true,
+    "max_T": 256,
+    "rope_base": 10000.0,
+    "steps": 2000,
+    "batch_size": 64,
+    "lr": 0.003,
+    "weight_decay": 0.01,
+    "grad_clip": 1.0,
+    "warmup": 100,
+    "seed": 0,
+    "device": "auto",
+    "eval_seqs": 512,
+    "out_dir": "results",
+    "tag": "probe_reverse_complex_rope_s0",
+    "log_every": 200,
+    "smoke": false,
+    "save_model": true
+  },
+  "real_params": 201792,
+  "wall_sec": 66.5,
+  "final_loss": 0.00010129315342055634,
+  "history": [
+    {
+      "step": 0,
+      "loss": 3.0078413486480713
+    },
+    {
+      "step": 200,
+      "loss": 0.09659013152122498
+    },
+    {
+      "step": 400,
+      "loss": 0.001017267000861466
+    },
+    {
+      "step": 600,
+      "loss": 0.00026745753712020814
+    },
+    {
+      "step": 800,
+      "loss": 0.0001694160746410489
+    },
+    {
+      "step": 1000,
+      "loss": 0.00014612957602366805
+    },
+    {
+      "step": 1200,
+      "loss": 0.00033893826184794307
+    },
+    {
+      "step": 1400,
+      "loss": 0.0001102015667129308
+    },
+    {
+      "step": 1600,
+      "loss": 0.00011723632633220404
+    },
+    {
+      "step": 1800,
+      "loss": 9.834256343310699e-05
+    },
+    {
+      "step": 1999,
+      "loss": 0.00010129315342055634
+    }
+  ],
+  "evals": {
+    "12": {
+      "length": 12,
+      "token_acc": 1.0,
+      "seq_acc": 1.0
+    },
+    "24": {
+      "length": 24,
+      "token_acc": 0.47705078125,
+      "seq_acc": 0.0
+    },
+    "48": {
+      "length": 48,
+      "token_acc": 0.17683919270833334,
+      "seq_acc": 0.0
+    }
+  }
+}
