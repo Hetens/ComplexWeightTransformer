@@ -76,7 +76,11 @@ def circular_stats(phases: np.ndarray) -> dict:
     c, s = np.cos(phases).mean(), np.sin(phases).mean()
     r = float(math.hypot(c, s))                       # mean resultant length in [0,1]
     z = n * r * r                                     # Rayleigh statistic
-    rayleigh_p = float(math.exp(-z) * (1.0 + (2.0 * z - z * z) / (4.0 * n)))  # 1st-order corrected
+    # 1st-order corrected Rayleigh p. The correction term goes negative once z^2 - 2z > 4n, which
+    # would report a negative probability exactly when concentration is strongest, i.e. in the case
+    # the test exists to detect. Max z over every committed run is 2.15, so this never fired on any
+    # published number, but it would have if banding had actually been present. Clamp to [0, 1].
+    rayleigh_p = float(min(max(math.exp(-z) * (1.0 + (2.0 * z - z * z) / (4.0 * n)), 0.0), 1.0))
     u = ((phases + math.pi) % (2.0 * math.pi)) / (2.0 * math.pi)
     d, d_plus, d_minus = _ks_uniform(u)
     v, kuiper_p = _kuiper_pvalue(d_plus, d_minus, n)
@@ -419,6 +423,26 @@ def main(results_dir: str = "results", runs: dict[str, str] | None = None,
         print(f"  {label:<22} {acc:>5} | {ent['circular_var']:>8.3f} {ent['ks_p']:>10.2e} | "
               f"{eig['circular_var']:>7.3f} {eig['ks_p']:>9.2e}")
 
+    # Modulus, not phase. Banding is a claim about *where on the circle* the eigenvalues sit, which
+    # presupposes they sit near it; a rotation has unit modulus. Unlike the uniformity tests above
+    # this is two-sided and does not rest on failing to reject, so it is what lets the paper say the
+    # registered mechanism is absent rather than undetected. Training moves the spectrum the wrong
+    # way for the hypothesis: the near-unit fraction *falls* relative to init.
+    null = metrics.get("init (Trabelsi null)")
+    if null is not None and "eigen_frac_near_unit" in null:
+        p0, n_ev = null["eigen_frac_near_unit"], null["eigen_angles"]["n"]
+        print("\nMODULUS check: do trained QK eigenvalues move ONTO the unit circle, as a rotation must?")
+        print(f"  init frac within 10% of |z|=1: {p0:.4f}  (n={n_ev} eigenvalues)")
+        print(f"  {'condition':<22} {'frac_near_unit':>14} {'2-prop z vs init':>17} {'|ev|max':>8}")
+        for label, m in metrics.items():
+            if label.startswith("init") or "eigen_frac_near_unit" not in m:
+                continue
+            p1 = m["eigen_frac_near_unit"]
+            pbar = 0.5 * (p0 + p1)
+            se = math.sqrt(max(2.0 * pbar * (1.0 - pbar) / n_ev, 1e-12))
+            print(f"  {label:<22} {p1:>14.4f} {(p0 - p1) / se:>+17.2f} {m['eigen_abs_max']:>8.2f}")
+        print("  (positive z = fewer eigenvalues near the unit circle than at init)")
+
     print("\nBEHAVIOUR-level (where inferred position must live): attention's positional dependence")
     print(f"  pos_fraction = positional share of logit variance (real+NoPE floor ~{1/256:.4f})")
     print(f"  {'condition':<22} {'pos_fraction':>13} {'rel_fraction':>13}")
@@ -439,5 +463,5 @@ if __name__ == "__main__":
         tagset: str = "d64"  # which run set: "d64" (default), "d128" (probe2_*), or "d160" (unity_*)
 
     a = tyro.cli(_Args)
-    subdir = "" if a.tagset == "d64" else a.tagset
+    subdir = a.tagset  # results/_figs/<tagset>/, one directory per probe scale
     main(a.results_dir, runs=TAGSETS[a.tagset], figs_subdir=subdir)
