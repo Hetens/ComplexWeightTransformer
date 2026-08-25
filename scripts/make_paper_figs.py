@@ -137,7 +137,9 @@ def fig_mechanism(df, L: int = 24):
     if len(algs) < 2 and len(wide) < 3:
         return None
 
-    fig, axes = plt.subplots(1, 2, figsize=(6.4, 2.6))
+    # Two panels that each need their own y-axis furniture: the left one has long tying labels, the
+    # right one a y-axis title. At the default wspace they collide, so give the pair explicit room.
+    fig, axes = plt.subplots(1, 2, figsize=(6.5, 3.0), gridspec_kw={"wspace": 0.40})
     rng = np.random.default_rng(0)
 
     ax = axes[0]
@@ -150,11 +152,11 @@ def fig_mechanism(df, L: int = 24):
         ax.scatter([v.mean()], [y], marker="|", s=140, color=INK, zorder=4, linewidths=1.2)
     if len(base):
         ax.axvline(base.mean(), color="#eda100", linewidth=1.2, linestyle=(0, (4, 2)), zorder=2)
-        # annotate in axis coords, anchored just right of the line, so it never collides with the
-        # title however many tying arms are present
-        ax.annotate("real+NoPE d224\n(param-matched)", xy=(base.mean(), -0.35),
+        # Keep this inside the axes. Below the axes it lands on top of the x-axis label; every tying
+        # scores >= 0.7 so the region left of the dashed line is empty and free for it.
+        ax.annotate("real+NoPE d224\n(param-matched)", xy=(base.mean() - 0.03, 0.97),
                     xycoords=("data", "axes fraction"), fontsize=6.2, color="#a87400",
-                    ha="center", va="bottom", annotation_clip=False)
+                    ha="right", va="top")
     ax.set_ylim(-0.6, len(algs) - 0.4)
     ax.set_yticks(range(len(algs) - 1, -1, -1))
     ax.set_yticklabels([lab for _, (lab, _) in algs], fontsize=6.8)
@@ -172,29 +174,46 @@ def fig_mechanism(df, L: int = 24):
     # across learning rates would average a tuned baseline with an untuned one. A baseline is compared
     # at its best, not at the rate that happens to flatter the method.
     rw = d[(d.cond == "real+none") & d.converged]
-    counts = rw.groupby(["dim", "lr"]).size()
+    rw_all = rw  # converged runs only; used below to detect widths that blew up at the base lr
     per_lr = (rw.groupby(["dim", "lr"])
               .agg(acc=("seq_acc", "mean"), sd=("seq_acc", "std"), n=("seq_acc", "size"),
                    params=("params", "mean")).reset_index())
     g = (per_lr.sort_values("acc").groupby("dim", as_index=False).last().sort_values("params"))
     ax.errorbar(g.params / 1e6, g.acc, yerr=g.sd.fillna(0), color="#eda100", marker="o",
                 markersize=3.2, linewidth=1.4, capsize=2, label="real+NoPE")
+    # Log x: the swept widths are spaced almost exactly 2x apart in parameters (1.54, 3.02, 6.16,
+    # 12.06, 24.61 M), so a linear axis crushes d160 and d224 together and their labels overlap. The
+    # claims in the text are ratios ("~4x the parameters") and a log axis is what makes those legible.
+    ax.set_xscale("log")
+    # Name each width on the axis rather than beside its point. Floating labels collided with the
+    # error bars at the low end and with the complex reference line at the high end.
+    ax.set_xticks(list(g.params / 1e6), minor=False)
+    ax.set_xticklabels([f"d{int(r.dim)}\n{r.params / 1e6:.1f}M" for r in g.itertuples()],
+                       fontsize=5.8)
+    ax.set_xticks([], minor=True)
+    ax.tick_params(axis="x", length=0)
+
+    # The convergence gate, drawn. Every width has *some* learning rate that converges, so plotting
+    # best-lr-per-width alone hides the failure the gate exists to catch. Mark the widest baseline at
+    # the rate tuned for d160, where all five seeds diverged: that point is a training failure, and
+    # scoring it as a capability limit is what would have manufactured support for our hypothesis.
+    base_lr = per_lr.lr.max()
     for r in g.itertuples():
-        ax.annotate(f"d{int(r.dim)}\nlr {r.lr:.0e}", (r.params / 1e6, r.acc), fontsize=5.5,
-                    color=MUTED, xytext=(0, -13), textcoords="offset points", ha="center")
-    # a width where every seed diverged at every rate tried would have no plottable point; mark it so
-    # the gap is not misread as missing data
-    allw = d[d.cond == "real+none"]
-    for dim in sorted(set(allw.dim.unique()) - set(g.dim)):
-        pr = allw[allw.dim == dim].params.mean() / 1e6
-        ax.annotate(f"d{int(dim)}\nno converged\nruns", (pr, 0.04), fontsize=5.5,
-                    color="#c0392b", ha="center", va="bottom")
-        ax.scatter([pr], [0.0], marker="x", s=22, color="#c0392b", zorder=4)
+        blown = rw_all[(rw_all.dim == r.dim) & (rw_all.lr == base_lr)]
+        tried = d[(d.cond == "real+none") & (d.dim == r.dim) & (d.lr == base_lr)]
+        if len(tried) and not len(blown):
+            ax.scatter([r.params / 1e6], [tried.seq_acc.mean()], marker="x", s=34,
+                       color="#c0392b", zorder=5, linewidths=1.4)
+            ax.annotate(f"all seeds diverged\nat lr {base_lr:.0e}", (r.params / 1e6, tried.seq_acc.mean()),
+                        fontsize=5.5, color="#c0392b", ha="right", va="bottom",
+                        xytext=(4, 7), textcoords="offset points")
     c = d[(d.cond == "complex+none") & (d.dim == 160)]
     if len(c):
         ax.axhline(c.seq_acc.mean(), color="#2a78d6", linewidth=1.3, zorder=2)
-        ax.text(g.params.max() / 1e6, c.seq_acc.mean() + 0.03, "complex+NoPE d160 (3.09M) ",
-                fontsize=6.2, color="#2a78d6", ha="right")
+        # Anchor left, not right: the right end of this line is exactly where d640 lands, and the
+        # label was printing over its marker and error bar.
+        ax.text(g.params.min() / 1e6, c.seq_acc.mean() + 0.035, "complex+NoPE d160 (3.09M)",
+                fontsize=6.2, color="#2a78d6", ha="left", va="bottom")
     ax.set_ylim(-0.02, 1.05)
     ax.set_xlabel("real parameters (M)")
     ax.set_ylabel(f"exact-match accuracy @ L={L}")
@@ -287,6 +306,12 @@ def fig_probe_depth(metrics_path: Path, L: int = 24):
     n_blocks = 0
     fig, ax = plt.subplots(figsize=(3.5, 2.5))
     for label, per_len in m.items():
+        # The RoPE runs in the metrics file are the positive control for the *frequency* statistic
+        # (they are handed a fixed-frequency code, so they show omega does not fall like 1/T there).
+        # This panel is about NoPE models bootstrapping position with no positional module, so
+        # plotting a model that was given one would answer a different question.
+        if "positive control" in label:
+            continue
         if str(L) not in per_len:
             continue
         rp = per_len[str(L)]["rotating_plane"]
@@ -336,8 +361,11 @@ def main(results_dir: str = "results", out_dir: str = "paper/figs") -> None:
         if fig is None:
             print(f"skip {name}: results not present yet")
             continue
-        fig.savefig(out / f"{name}.pdf")
-        fig.savefig(out / f"{name}.png")
+        # Pin the embedded creation timestamp. Without this, matplotlib stamps "now" into every
+        # PDF/PNG, so a rerun on identical inputs produces a different file and the "figures are
+        # byte-reproducible from the committed results" claim in paper/README.md is not checkable.
+        fig.savefig(out / f"{name}.pdf", metadata={"CreationDate": None})
+        fig.savefig(out / f"{name}.png", metadata={"Software": None})
         print(f"wrote {out / name}.pdf/.png")
 
 

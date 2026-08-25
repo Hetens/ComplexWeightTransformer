@@ -13,7 +13,7 @@ A **complex-weight transformer (complex-NoPE)**: all linear maps, norms, attenti
 
 **Claim being tested:** because a complex linear layer is intrinsically a phase-equivariant map (see
 `background.md` §5.1), a complex-NoPE model can *infer* RoPE-like relative-phase structure from the causal
-mask + depth alone, recovering the capability that explicit RoPE supplies — and eventually doing so with
+mask + depth alone, recovering the capability that explicit RoPE supplies, and eventually doing so with
 fewer parameters.
 
 ---
@@ -28,21 +28,21 @@ fewer parameters.
 | **`C-NoPE`** | **complex** | **none (the candidate)** |
 | `C-RoPE`   | complex | RoPE (diagnostic: does complex help *on top of* RoPE?) |
 
-### Capacity-matching (fairness — runs done both ways)
+### Capacity-matching (fairness: runs done both ways)
 A complex `d×d` layer = `2d²` real DOF. We compare at:
-- **(a) matched real-DOF** — equal expressivity budget → the **capability** question.
-- **(b) matched complex-entries / fewer real-DOF** — fewer numbers → the **compression** question.
+- **(a) matched real-DOF**: equal expressivity budget → the **capability** question.
+- **(b) matched complex-entries / fewer real-DOF**: fewer numbers → the **compression** question.
 
 ---
 
 ## Hypotheses
 
-### Primary — Capability
+### Primary: Capability
 - **H1_cap:** at **matched real-DOF**, `C-NoPE` achieves **higher** length-extrapolation accuracy than
   `R-NoPE`, **and** is **statistically competitive with** `R-RoPE` (within a pre-set margin).
 - **H0_cap:** `C-NoPE ≤ R-NoPE` on length extrapolation, within seed noise.
 
-### Secondary — Compression
+### Secondary: Compression
 - **H1_comp:** on the **quality-vs-total-real-parameters** Pareto frontier, `C-NoPE` lies **on or above**
   the `R-RoPE` frontier (matches quality with no positional module and/or fewer params).
 - **H0_comp:** no Pareto improvement at equal quality.
@@ -96,7 +96,7 @@ length-gen tasks; learned-APE collapses past `L`) before complex results are tru
 | F4 | `C-NoPE` never reaches the `R-RoPE` Pareto frontier | H1_comp (compression claim) |
 | F5 | Complex models can't train stably to a fair comparison despite correct grads/init | feasibility for this regime |
 
-Any of F1–F2 rejects the **primary** hypothesis; F4 rejects the **secondary**; F3/F5 weaken
+Any of F1-F2 rejects the **primary** hypothesis; F4 rejects the **secondary**; F3/F5 weaken
 interpretation/feasibility. A clean negative is a valid, reportable outcome.
 
 ---

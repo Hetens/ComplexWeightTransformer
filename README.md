@@ -11,7 +11,7 @@ block-diagonal control with no complex arithmetic reproduces it) and **not out o
 width** (a tuned real model matches it at ~4x the parameters). What remains is a
 **parameter-efficiency** result on one task out of six.
 
-## Results (270 runs: 160-run sweep + ablation, plus a 110-run follow-up)
+## Results (270 runs: a 140-run sweep + 20-run ablation in round one, plus 110 in round two)
 
 Exact-match sequence accuracy past the trained length (train lengths 6-16), mean ± std over 5 seeds.
 Full log and claim-by-claim verdicts in [`docs/results.md`](docs/results.md); every number reproduces
@@ -40,13 +40,19 @@ and a real+NoPE width scan, both arms tuned over the same learning-rate grid, co
 
 | real width | params | x complex | seq@24 | vs complex |
 |---|---|---|---|---|
-| d224 (matched) | 3.02M | 1.0x | 0.407 ± 0.085 | +0.450, p = 0.0002 |
+| d224 (matched params) | 3.02M | 1.0x | 0.407 ± 0.085 | +0.450, p = 0.0002 |
+| d320 (**matched width**) | 6.16M | 2.0x | 0.654 ± 0.234 | +0.202, p = 0.13 |
 | d448 | 12.06M | 3.9x | 0.811 ± 0.090 | +0.045, p = 0.33 |
 | d640 | 24.61M | 8.0x | **0.868 ± 0.040** | -0.012, p = 0.57 |
 
+(complex+NoPE d160 is 0.856 ± 0.018 at 3.09M. The d320 row is the control that matters most: it is an
+ordinary real transformer at *exactly* the same activation width 320, with the tying removed, so it
+costs twice as much and still scores lower. Width alone does not buy the effect; the tying is what
+makes that width cheap, and reliable.)
+
 - **Mechanism: falsified, twice.** Trained complex QK weights show no RoPE-like phase structure at
   three scales. Probing the *activations* instead finds every NoPE model builds a positional rotation,
-  but it encodes **fractional** position (total swept angle invariant across a 3x length range), so
+  but it encodes **fractional** position (total swept angle invariant across a 4x length range), so
   there is no fixed rotation for weights to store. Two further pre-registered mechanistic predictions
   failed, one of them backwards: the parameter-matched real models own *cleaner* attention staircases
   than the complex models that outscore them.
@@ -62,6 +68,11 @@ and a real+NoPE width scan, both arms tuned over the same learning-rate grid, co
 - **The tying buys consistency as much as accuracy:** complex ± 0.018 against ± 0.090-0.234 for the
   wide real baselines, which is why the significance boundary (2x) and the point-estimate crossover
   (4x) disagree.
+- **Two more pre-registered predictions died in round two.** The retrieval-offset law (that the
+  advantage should follow tasks whose fetch offset does not depend on input length) failed on two
+  purpose-built tasks, with the larger point estimate on the wrong one. And re-scoring needle out to a
+  1024-token haystack falsified the prediction that complex would hold ceiling: it falls fastest, and
+  the parameter-matched real baseline is ahead by 1024.
 - **Training recipe:** CReLU is the piece that matters; the d160-tuned lr does *not* transfer up the
   width axis (real d640 fails to train at all at 2e-3 and reaches 0.87 at 5e-4).
 
@@ -102,7 +113,7 @@ uv run python -m experiments.sweep --tasks reverse --core none --real-width-scan
 # offset-law tasks; re-score committed checkpoints at longer haystacks; activation-level probe
 uv run python -m experiments.sweep --tasks revskip skipcopy --core pair
 uv run python -m experiments.reeval --match "unity_needle_*_none_*" --lengths 256 512 1024
-uv run python -m experiments.activation_probe --lengths 16 24 48
+uv run python -m experiments.activation_probe --lengths 16 24 32 48 64
 ```
 
 ## Layout

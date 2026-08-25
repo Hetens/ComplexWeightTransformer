@@ -15,13 +15,13 @@ a score `qᵢ · kⱼ` that depends only on the *content* of tokens `i` and `j`,
 So a plain attention block sees a sequence as a **set**, not a **sequence**. "The dog bit the man" and
 "The man bit the dog" would be indistinguishable to the content path.
 
-Language, code, and grids are not sets — order and 2-D layout carry meaning. The fix is to inject
+Language, code, and grids are not sets; order and 2-D layout carry meaning. The fix is to inject
 **positional information** so attention can become position-aware. How you inject it is the
 *positional encoding* (PE) design space.
 
 A subtlety this project hinges on: **decoder-only (causal) transformers are not fully permutation
 equivariant** even without a PE, because the causal mask makes token `i` attend only to `j ≤ i`. That
-asymmetry leaks weak positional signal — which is why "no positional encoding" (NoPE) can work at all
+asymmetry leaks weak positional signal, which is why "no positional encoding" (NoPE) can work at all
 (see §6).
 
 ---
@@ -66,7 +66,7 @@ In real 2-vector form this is a rotation matrix:
 
 The per-pair frequencies are a geometric series `θ_j = base^{−2j/d}` (base usually 10000), so low-index
 pairs rotate fast (capture short-range order) and high-index pairs rotate slowly (capture long-range
-order) — a multi-scale "clock."
+order), a multi-scale "clock."
 
 ### 3.2 Why it gives *relative* position for free
 After rotating query at `m` and key at `n`, their interaction depends only on `m − n`:
@@ -93,7 +93,7 @@ diagonal sensitivity. Relevant here because "spatial reasoning" claims rest on 2
 - **Modulus / phase:** `z = a + ib = |z| e^{i·arg z}`, `|z| = √(a²+b²)`.
 - **Conjugate:** `z̄ = a − ib`. `z·z̄ = |z|²` (real, ≥ 0).
 - **Hermitian inner product** on `ℂⁿ`: `⟨u, v⟩ = Σ uᵢ v̄ᵢ`. Its real part `Re⟨u,v⟩` equals the ordinary
-  real dot product of the stacked `[Re; Im]` vectors — this is how we get real attention logits from
+  real dot product of the stacked `[Re; Im]` vectors; this is how we get real attention logits from
   complex Q/K (§5.4).
 
 ---
@@ -116,7 +116,7 @@ forced to `[[A, −B],[B, A]]`. Two consequences:
 1. **Parameter count:** `2·d_out·d_in` real numbers, vs `4·d_out·d_in` for an *unconstrained* real
    `2d×2d` layer → the ~2× / "50%" efficiency that CRoPE markets.
 2. **Inductive bias:** these are precisely the real maps that **commute with multiplication by `i`**
-   (the matrix `J=[[0,−I],[I,0]]`). They are *phase-equivariant* — rotate the input's phase and the
+   (the matrix `J=[[0,−I],[I,0]]`). They are *phase-equivariant*: rotate the input's phase and the
    output's phase rotates the same way. RoPE's pure rotation `[[cos,−sin],[sin,cos]]` is the special
    case `A=cosα·I, B=sinα·I`. **This is exactly why complex weights are a natural home for RoPE-like
    behavior.**
@@ -131,21 +131,21 @@ forced to `[[A, −B],[B, A]]`. Two consequences:
 A function `ℂ→ℂ` that is interesting and bounded **cannot be complex-differentiable (holomorphic)**
 everywhere (Liouville). So practical CVNNs use *non-holomorphic* activations and rely on `ℝ²` autograd
 (Wirtinger calculus, §5.5). Common choices:
-- **CReLU:** `ReLU(Re z) + i·ReLU(Im z)` — simplest, splits real/imag. Strong default.
-- **modReLU:** `ReLU(|z| + b) · z/|z|` — thresholds *magnitude*, **preserves phase** (good when phase is
+- **CReLU:** `ReLU(Re z) + i·ReLU(Im z)`, simplest, splits real/imag. Strong default.
+- **modReLU:** `ReLU(|z| + b) · z/|z|`, thresholds *magnitude*, **preserves phase** (good when phase is
   the carrier of position; `b` learnable).
 - **zReLU:** pass `z` only if both parts are positive (phase in the first quadrant), else 0.
 
 ### 5.3 Complex normalization
 - **Proper complex LayerNorm/BN** (Trabelsi 2018): treat each unit as a 2-D vector and whiten with its
-  `2×2` covariance — correct but heavier.
-- **ComplexRMSNorm (our default):** `z ← z / √(mean(|z|²)+ε) · γ`. Cheap, magnitude-only, phase-preserving
-  — well suited to a project where phase carries the signal we care about.
+  `2×2` covariance, correct but heavier.
+- **ComplexRMSNorm (our default):** `z ← z / √(mean(|z|²)+ε) · γ`. Cheap, magnitude-only, phase-preserving.
+  Well suited to a project where phase carries the signal we care about.
 
 ### 5.4 Complex attention
 With complex `q, k, v`: logits = `Re(Σ qᵢ k̄ᵢ)` (real part of the Hermitian inner product), softmax over
 real logits, output `Σ softmax · v` (complex). If `q, k` happen to carry position-dependent phase, the
-real part naturally produces a `cos((m−n)θ)`-modulated score — i.e., attention *can* recover the RoPE
+real part naturally produces a `cos((m−n)θ)`-modulated score, i.e. attention *can* recover the RoPE
 relative-position effect from learned phase. This is the mechanistic crux.
 
 ### 5.5 Initialization & optimization
@@ -162,7 +162,7 @@ relative-position effect from learned phase. This is the mechanistic crux.
 
 ---
 
-## 6. NoPE — why "infer position" is even plausible
+## 6. NoPE: why "infer position" is even plausible
 
 "Transformers without Positional Encodings" (Haviv 2022) and "The Impact of PE on Length Generalization"
 (Kazemnejad, NeurIPS 2023) show that **causal** decoder-only models with **no** explicit PE:
@@ -170,8 +170,8 @@ relative-position effect from learned phase. This is the mechanistic crux.
 - frequently **match or beat** explicit PE (including RoPE) on length-generalization tasks.
 
 The causal mask breaks permutation symmetry enough for position to emerge from depth. This is the
-theoretical license for the project: if a *real* NoPE model can infer position, a *complex* NoPE model —
-which has phase machinery built into every weight — might infer it *better* or *cheaper*. That delta is
+theoretical license for the project: if a *real* NoPE model can infer position, a *complex* NoPE model,
+which has phase machinery built into every weight, might infer it *better* or *cheaper*. That delta is
 exactly H1 (`hypothesis.md`).
 
 ---
@@ -181,7 +181,7 @@ exactly H1 (`hypothesis.md`).
 The idea was sparked by **HRM** (Hierarchical Reasoning Model) and **TRM** (Tiny Recursive Model, Samsung
 SAIL, 2025): a ~7M-parameter, 2-layer network that *recurses* on a latent scratchpad `z` and a current
 answer `y`, reaching SOTA-for-its-size on ARC-AGI. In such tiny models, the embedding/positional machinery
-is a **large fraction** of parameters, and the *same weights* are reused at every recursion step — so a
+is a **large fraction** of parameters, and the *same weights* are reused at every recursion step, so a
 positional scheme baked into the weights (rather than added per step) is especially attractive. We do
 **not** benchmark on grid puzzles in this PoC (dropped for clean, comparable signal), but this regime is
 the motivation and the eventual target for scale-up.
@@ -190,7 +190,7 @@ the motivation and the eventual target for scale-up.
 
 ## 8. Glossary
 - **APE / RPE:** absolute / relative positional encoding.
-- **RoPE:** rotary positional embedding — position as a rotation of Q/K pairs.
+- **RoPE:** rotary positional embedding, position as a rotation of Q/K pairs.
 - **NoPE:** no explicit positional encoding (rely on causal mask + depth).
 - **CVNN:** complex-valued neural network.
 - **Holomorphic:** complex-differentiable; most useful activations are not.

@@ -1,14 +1,17 @@
 # Results & running log
 
-**TL;DR (final verdict, 2026-07-10, Unity 5-seed sweep + ablation, 160/160 runs converged).**
-H1_mech is falsified at three scales: trained complex QK weights show no RoPE-like phase structure,
-statistically indistinguishable from the random init even at full task mastery. H1_comp is not
-supported: complex costs ~2x parameters at equal dim and buys nothing at matched parameters outside
-reverse. One capability survives 5 seeds and both capacity controls: complex+NoPE roughly doubles
-exact-match length generalization on reverse (seq@24 = 0.86 ± 0.02 vs 0.41 ± 0.08 param-matched,
-p = 0.0002), and the learn_imag ablation attributes it to the complex weights themselves (ablated
-0.84 ± 0.06, p = 0.68 vs full). The pilot's sort, needle, and RoPE-enhancer readings did not survive.
-Full verdicts: [Hypothesis verdict, FINAL](#hypothesis-verdict-final-unity-5-seed-sweep-2026-07-09--ablationprobe-2026-07-10).
+**TL;DR (current, 2026-07-28, two rounds, 270 runs).** The mechanism is falsified: trained complex QK
+weights show no RoPE-like phase structure at three scales, indistinguishable from random init even at
+full task mastery. One behavioural effect survives everything thrown at it: on reverse, complex+NoPE
+holds exact-match 0.856 ± 0.018 at 1.5x the training length against 0.407 ± 0.085 for a tuned real
+baseline at equal parameters (p = 0.0002). Round two then established what that effect is *not*. It is
+not about complex numbers (a block-diagonal control with no complex arithmetic matches it, p = 0.31)
+and it is not beyond real width (a tuned real model reaches 0.868 at ~8x the parameters). What is left
+is a **parameter-efficiency** result from two-stream weight tying, on one task out of six, plus a large
+gain in seed-to-seed consistency. Five further pre-registered predictions failed, one of them backwards.
+Current verdict: [Verdict after round two](#verdict-after-round-two-2026-07-28). Round one's reading,
+kept intact for the record:
+[Hypothesis verdict, ROUND ONE](#hypothesis-verdict-round-one-unity-5-seed-sweep-2026-07-09--ablationprobe-2026-07-10).
 
 Living document: methodology findings first (things we learned while building the harness that change
 how the experiment must be run), then quantitative results and the hypothesis verdict. See
@@ -18,7 +21,7 @@ how the experiment must be run), then quantitative results and the hypothesis ve
 
 ## Methodology findings (M2-M4)
 
-These are real findings — each one would have biased the experiment if missed.
+These are real findings: each one would have biased the experiment if missed.
 
 1. **Causal-mask task design.** An *in-place* reverse (output[i] aligned with input[i]) is
    **mathematically unsolvable** for a causal LM at early positions: position 0 sees only input[0] yet
@@ -39,10 +42,10 @@ These are real findings — each one would have biased the experiment if missed.
 
    modReLU's failure was masquerading as an "optimization problem" / "complex can't fit." It was the
    activation. **Default is now CReLU.** (modReLU preserves phase, which is theoretically attractive for
-   "phase carries position"; making it competitive needs a tuned magnitude threshold — logged as future
+   "phase carries position"; making it competitive needs a tuned magnitude threshold, logged as future
    work. The phase machinery still lives in the linear + attention layers, so CReLU does not remove it.)
 
-   *Lesson:* this is exactly the "incomplete experiments" failure mode that got ComplexFormer withdrawn —
+   *Lesson:* this is exactly the "incomplete experiments" failure mode that got ComplexFormer withdrawn:
    an under-tuned complex model looks like evidence against the hypothesis. We tune before concluding.
 
 4. **`complex+NoPE` training is strongly bimodal / initialization-sensitive.** On the solvable reverse
@@ -50,7 +53,7 @@ These are real findings — each one would have biased the experiment if missed.
 
    | seed | acc@12 |
    |---|---|
-   | 0 | **0.89** (good basin — fits, loss 0.15) |
+   | 0 | **0.89** (good basin, fits, loss 0.15) |
    | 1 | 0.35 (collapsed, loss ~1.25) |
    | 2 | 0.34 (collapsed) |
 
@@ -99,12 +102,12 @@ These are real findings — each one would have biased the experiment if missed.
 | real + RoPE (d64) | 100,928 | **1.00** | 0.15 | 0.08 |
 | real + NoPE (d64) | 100,928 | 0.77 | 0.30 | 0.13 |
 | real + NoPE (d92, param-matched) | 206,908 | 0.84 | 0.37 | 0.18 |
-| complex + NoPE (d64, **modReLU — under-tuned**) | 200,896 | 0.35 | 0.21 | 0.12 |
+| complex + NoPE (d64, **modReLU, under-tuned**) | 200,896 | 0.35 | 0.21 | 0.12 |
 
 Read: RoPE is perfect in-distribution but extrapolates worst; NoPE extrapolates best *relatively*. The
-complex row here used the broken activation — **re-run with CReLU pending** (sweep `bsiqrzoz7`).
+complex row here used the broken activation; **re-run with CReLU pending** (sweep `bsiqrzoz7`).
 
-### Capacity-matched sweep — reverse + copy, 3 seeds, 2000 steps, GTX 1050 (complex uses learn_imag=True)
+### Capacity-matched sweep: reverse + copy, 3 seeds, 2000 steps, GTX 1050 (complex uses learn_imag=True)
 
 In-distribution accuracy (acc@12) and **success_rate** = fraction of seeds with acc>0.7:
 
@@ -127,21 +130,21 @@ Length extrapolation (mean acc@24 / acc@48):
 | real + RoPE (d64) | 0.068 / 0.066 | 0.222 / 0.100 |
 | real + learned | 0.221 / 0.150 | 0.104 / 0.089 |
 
-Reads: (1) RoPE is perfect in-distribution but extrapolates *worst* (overfits the trained length —
+Reads: (1) RoPE is perfect in-distribution but extrapolates *worst* (overfits the trained length;
 real+RoPE copy@24 = 0.07). (2) **complex+NoPE, when it converges, matches or beats real+NoPE both
 in-distribution and at @24** on both tasks. (3) **complex+RoPE has the best reverse extrapolation
 (0.417 @24, ~2× real+RoPE).** (4) complex+NoPE's weakness is **reliability**: solid on copy (3/3),
 shaky on the harder reverse (2/3).
 
-### Rigorous local sweep — all 4 tasks, d160 / 5 layers / 10k steps, GTX 1050
+### Rigorous local sweep: all 4 tasks, d160 / 5 layers / 10k steps, GTX 1050
 
 `scripts/local_rigorous_sweep.sh` (completed 2026-06-23). Step-up from the probe scale: **d160, 5 layers,
-10k steps**, train lengths 6–16, eval at 16 (in-dist) / 32 / 64 / 96. complex+NoPE gets **3 seeds** on
+10k steps**, train lengths 6-16, eval at 16 (in-dist) / 32 / 64 / 96. complex+NoPE gets **3 seeds** on
 reverse+copy (the reliability question); the stable conditions and the first-ever sort+needle runs get
 **1 seed**. Complex backbone = 3.09M params, real = 1.54M (~2×). **First data on `sort` and `needle`.**
 
 Two metrics matter and tell different stories: **token_acc** (per-position, the log's `acc@L`) and
-**seq_acc** (exact full-sequence match — far stricter, and the honest length-gen metric). Token_acc, n=3
+**seq_acc** (exact full-sequence match, far stricter and the honest length-gen metric). Token_acc, n=3
 conditions are seed means:
 
 | condition | task | tok@16 | tok@32 | tok@64 | tok@96 | seq@32 | seq@64 | seq@96 |
@@ -166,59 +169,59 @@ conditions are seed means:
 Reads:
 
 1. **The collapse is gone at scale.** complex+NoPE converged **3/3 on reverse** (was 2/3 at d64) and 3/3 on
-   copy — in-dist tok@16 = 1.00, seq@16 = 1.00 every seed. Confirms the d128 probe set: the bimodal
+   copy; in-dist tok@16 = 1.00, seq@16 = 1.00 every seed. Confirms the d128 probe set: the bimodal
    initialization sensitivity that gated the primary hypothesis **does not appear at d160 / 10k**. The
    reliability caveat is no longer the bottleneck.
 
 2. **complex+NoPE ≥ real+NoPE on all four tasks**, in-dist and at length. The standout is **sort**, the most
    discriminating task: complex+NoPE holds **seq@64 = 0.758 / seq@96 = 0.371** vs real+NoPE's 0.596 / 0.035
-   — a **~10× exact-match advantage at the longest length**. (Caveat: real conditions are n=1 here, so this
+   a **~10x exact-match advantage at the longest length**. (Caveat: real conditions are n=1 here, so this
    is a clean single-seed read, not a seed-averaged one.)
 
 3. **NoPE ≫ RoPE for length generalization on algorithmic tasks.** Under exact-match (seq_acc), **every RoPE
-   run collapses to 0 beyond the trained length** on reverse/copy/sort — RoPE memorizes absolute trained
+   run collapses to 0 beyond the trained length** on reverse/copy/sort: RoPE memorizes absolute trained
    positions and cannot extrapolate the permutation. complex+NoPE is the best length extrapolator overall on
    these tasks. (This sharpens, and is consistent with, the earlier "RoPE extrapolates worst" reading.)
 
-4. **token_acc overstates length-gen.** Reverse/copy reach 0 *exact-match* by @32–64 even where token_acc
+4. **token_acc overstates length-gen.** Reverse/copy reach 0 *exact-match* by @32-64 even where token_acc
    looks healthy (e.g. reverse complex+NoPE tok@64 = 0.505 but seq@64 = 0.00): a handful of wrong positions
    per sequence. Only **sort and needle** retain meaningful exact-match at length, and on both, complex wins
    its bracket.
 
-5. **needle is non-discriminating among NoPE** — complex+NoPE and real+NoPE are **both perfect (1.00)** at
+5. **needle is non-discriminating among NoPE**: complex+NoPE and real+NoPE are **both perfect (1.00)** at
    every length, as predicted (needle is content-addressable: find MARK by content, emit the +1 token; little
    positional reasoning required). It still shows the enhancer effect at the RoPE level: **complex+RoPE
-   (seq@96 = 0.740) > real+RoPE (0.543)** — complex helping RoPE again.
+   (seq@96 = 0.740) > real+RoPE (0.543)**, complex helping RoPE again.
 
-**Net:** at this scale the primary capability story is **positive and now reliable** — complex+NoPE trains
+**Net:** at this scale the primary capability story is **positive and now reliable**: complex+NoPE trains
 3/3, beats real+NoPE everywhere, and decisively out-extrapolates it on sort; and the RoPE-enhancer thread
 holds on needle. The honest limiter is that reverse/copy are exact-match-saturated past @32, so the cleanest
 length-gen evidence comes from sort.
 
-### Mechanistic probe (H1_mech) — does emergent RoPE-like phase structure live in the weights?
+### Mechanistic probe (H1_mech): does emergent RoPE-like phase structure live in the weights?
 
 `experiments/phase_probe.py`, run on two independent scales of the solvable reverse task:
 **d64 / 2-layer / 2000-step** (`probe_*` tags, `--tagset d64`) and **d128 / 4-layer / 8000-step**
 (`probe2_*` tags, `--tagset d128`). The d128 set is the decisive one: every condition **fully solves the
-task** (acc@16 = 1.00, final loss ~1e-4) and **all four complex-NoPE seeds converged — no collapse** — so
+task** (acc@16 = 1.00, final loss ~1e-4) and **all four complex-NoPE seeds converged, no collapse**, so
 this is a converged-vs-converged comparison at full task mastery. Two levels of test:
 
-**1. Weight-level (H1_mech exactly as pre-registered): NOT supported — F3, now confirmed at scale.**
+**1. Weight-level (H1_mech exactly as pre-registered): NOT supported (F3), now confirmed at scale.**
 Pooled QK entry-phases and eigenvalue-angles are tested for non-uniform banding against the Trabelsi-init
 null with three circular tests (Rayleigh / KS / Kuiper, no scipy). At d128:
 
 | condition (d128) | acc@16 | entry circ-var | entry KS-p | eigen circ-var | eigen KS-p |
 |---|---|---|---|---|---|
-| init (Trabelsi null) | — | 0.997 | 0.093 | 0.995 | 1.00 |
+| init (Trabelsi null) | n/a | 0.997 | 0.093 | 0.995 | 1.00 |
 | C-NoPE (s0) | 1.00 | 0.996 | 0.058 | 0.999 | 0.99 |
 | C-NoPE (s2) | 1.00 | 0.997 | 0.400 | 0.996 | 1.00 |
 | C-RoPE | 1.00 | 0.996 | 0.133 | 0.997 | 1.00 |
 
-Circular variance ≈ 1 (uniform) and **every** uniformity p ≫ 0.05 for converged *and* RoPE models —
+Circular variance ≈ 1 (uniform) and **every** uniformity p ≫ 0.05 for converged *and* RoPE models:
 **statistically indistinguishable from the untrained init**. No phase banding appears even though the model
 now clearly solves the task, ruling out the d64 worry that structure was merely under-trained. d64 gave the
 identical reading. *Argued mis-specification:* under NoPE the weights are position-independent, so RoPE's
-runtime `m·θ` rotation is applied per-token at inference, not *stored* in W_q/W_k — there is nothing for
+runtime `m·θ` rotation is applied per-token at inference, not *stored* in W_q/W_k; there is nothing for
 the weights to band. The registered weight-level claim is the wrong place to look.
 
 **2. Behaviour-level (where inferred position must actually live): complex helps RoPE, not NoPE.**
@@ -232,10 +235,10 @@ the weights to band. The registered weight-level claim is the wrong place to loo
 | C-RoPE | **0.67** | 0.34 |
 | R-RoPE | 0.55 | 0.33 |
 
-Reads: (1) **C-NoPE ≈ R-NoPE** (0.39–0.44 vs 0.43) → complex weights give **no positional advantage under
-NoPE** — and this now holds for *converged* seeds, not just collapsed ones. (2) **C-RoPE > R-RoPE** (0.67 vs
-0.55) → complex weights **amplify** RoPE's positional signal (d64: 0.83 vs 0.66 — same direction). (3) NoPE's
-emergent position is less relative (rel_fraction 0.19–0.23) than RoPE's (0.33–0.34): what little position
+Reads: (1) **C-NoPE ≈ R-NoPE** (0.39-0.44 vs 0.43) → complex weights give **no positional advantage under
+NoPE**, and this now holds for *converged* seeds, not just collapsed ones. (2) **C-RoPE > R-RoPE** (0.67 vs
+0.55) → complex weights **amplify** RoPE's positional signal (d64: 0.83 vs 0.66, same direction). (3) NoPE's
+emergent position is less relative (rel_fraction 0.19-0.23) than RoPE's (0.33-0.34): what little position
 NoPE bootstraps from the causal mask is more absolute/content-driven, not a recovered RoPE kernel.
 
 **Net:** the literal mechanism (complex QK weights internalize RoPE's rotation as banded phase structure) is
@@ -357,11 +360,13 @@ Two qualifications, stated so the result is not over-read:
 - This shows the effect is *not about ℂ*; it does **not** yet show what it *is* about. "Two streams
   at 3.09M parameters" and "activation width 320" are still confounded, because every tying here buys
   width 320 at half the parameters an unconstrained 320-wide layer would cost. `H2_width` (the real
-  width scan) is the arm that separates them, and it is still running.
+  width scan) is the arm that separates them, and it does: the real d320 point below is an
+  unconstrained real model at exactly width 320, and it reaches only 0.654 ± 0.234 while costing
+  6.16M parameters against complex's 3.09M. Width 320 on its own does not buy the effect.
 
 #### H2_width: **F7 fires.** Real width does buy the gap, at roughly 4x the parameters.
 
-*(lr=2e-3 pass complete, 15/15 runs; the retuned d448/d640 supplement is job 62210295, in flight.)*
+*(Complete. lr=2e-3 pass 15/15 runs; retuned d320/d448/d640 supplement job 62210295; complex lr grid job 62221575.)*
 
 **Methodology finding first, because it determines how the arm may be read.** `lr=2e-3` is the value
 tuned at d160 and used by every run in the committed 160-run sweep. It does **not** transfer up the
@@ -448,9 +453,10 @@ at d640, 8.0x). Round one recorded H1_comp as NOT supported on the strength of t
 evidence but under-powered on the parameter axis, and **on reverse it is now reversed**: there is a
 real Pareto point. It remains one task out of six, it is a statement about parameter efficiency
 rather than about complex numbers, and the ~4x figure is the resolution of our width grid rather than
-a measured crossover. It is also provisional in one direction we can still check: complex has so far
-only been run at lr=2e-3, so 0.856 may not be its ceiling either, and the in-flight lr sweep can only
-move this ratio *up*.
+a measured crossover. One caveat we raised at the time is now closed: complex had until then only been
+run at lr=2e-3, so 0.856 might not have been its ceiling. The complex lr grid (job 62221575) has since
+run, and 2e-3 *was* the best of the three rates (0.856 against 0.828 at 1e-3 and 0.829 at 5e-4), so the
+ratio does not move.
 
 #### H3_offset: NOT SUPPORTED. Length-independence does not predict where complex wins.
 
@@ -519,8 +525,8 @@ carries no position and correctly reads ~0 in every condition, a sanity check on
 
 | condition | blk0 | blk1 | blk2 | blk3 | blk4 |
 |---|---|---|---|---|---|
-| complex+NoPE s0/s1/s2 | 0.00 | 0.80 | 0.97-0.98 | 0.97-0.99 | **0.98-0.99** |
-| complex+NoPE (no input phase) | 0.00 | 0.79 | 0.94 | 0.95 | **0.97** |
+| complex+NoPE s0/s1/s2 | 0.00 | 0.80-0.81 | 0.97-0.98 | 0.97-0.99 | **0.98-0.99** |
+| complex+NoPE (no input phase) | 0.00 | 0.79 | 0.93 | 0.95 | **0.97** |
 | real+NoPE d160 s0/s1/s2 | 0.00 | 0.79 | 0.96-0.97 | 0.00-0.95 | 0.00 / 0.88 / 0.93 |
 | real+NoPE d224 s0/s1/s2 | 0.00 | 0.79 | 0.95-0.97 | 0.00 / 0.90 / 0.00 | **0.00 / 0.00 / 0.00** |
 
@@ -533,21 +539,25 @@ Three readings, in decreasing order of confidence:
 2. **It is a *fractional*-position code, not a fixed-frequency clock.** The discriminator is the total
    angle swept across the sequence: a RoPE-like clock holds omega fixed and sweeps proportionally
    further as the sequence grows, while a normalized-position code holds the *sweep* fixed and shrinks
-   omega like 1/T. Deepest-block total sweep, in radians, over a 3x span of evaluation length:
+   omega like 1/T. Deepest-block total sweep, in radians, over a 4x span of evaluation length:
 
-   | condition | L=16 | L=24 | L=48 |
-   |---|---|---|---|
-   | complex+NoPE s0 / s1 / s2 | 5.41 / 5.53 / 5.43 | 5.43 / 5.65 / 5.42 | 5.38 / 5.64 / 5.27 |
-   | complex+NoPE (no input phase) | 5.22 | 5.29 | 5.08 |
+   | condition | L=16 | L=24 | L=32 | L=48 | L=64 |
+   |---|---|---|---|---|---|
+   | complex+NoPE s0 / s1 / s2 | 5.41 / 5.53 / 5.43 | 5.43 / 5.66 / 5.42 | 5.42 / 5.69 / 5.38 | 5.38 / 5.64 / 5.27 | 5.34 / 5.59 / 5.19 |
+   | complex+NoPE (no input phase) | 5.22 | 5.29 | 5.25 | 5.08 | 4.95 |
 
-   All four complex runs hold ~5.1-5.7 rad while the sequence triples, so the code is normalized
+   All four complex runs hold ~5.0-5.7 rad while the sequence quadruples, so the code is normalized
    position, which is length-invariant by construction. This also finally explains why the registered
    weight-level H1_mech had to come back null: there is no fixed rotation for the weights to store.
+   A positive control for this statistic (the same probe on RoPE checkpoints, which are handed a fixed
+   frequency by construction) is in [`next-directions.md`](next-directions.md): it fires, so the
+   invariance above is a property of the models and not a blind spot of the measurement.
 3. **The depth dissociation is real but does not explain the behaviour, and it is not clean.** At the
    trained-length scale the split is total: at L=16 and L=24 all three parameter-matched real seeds
-   read R^2 <= 0.002 at the last block while all four complex models read 0.96-0.99. But at L=48 one
-   real d224 seed (s0) acquires a deep rotation (0.944, sweep 6.12) while the other two stay at
-   0.005-0.010, so the property is seed- and length-dependent in the real field rather than absent.
+   read R^2 <= 0.002 at the last block while all four complex models read 0.96-0.99. Extending the
+   length axis to 32 and 64 shows the real seeds are erratic rather than uniformly lacking: d224 s0
+   acquires a deep rotation from L=32 (0.93-0.94), s1 only at L=64 (0.92), and s2 never does anywhere
+   in the range (max 0.03). So the property is seed- and length-dependent in the real field, not absent.
    More decisively, *within* real+NoPE d160 the association with the outcome runs **backwards**:
    seed 0 has no deep rotation at L=16/24 (R^2 = 0.001) and the **best** reverse seq@24 of its
    condition (0.609); seed 2 has the strongest (0.928) and the **worst** (0.227). A property that
@@ -584,8 +594,8 @@ cleanly. Measured per head as exact-hit rate and as attention mass on the requir
 | condition | best hit rate | mass on required source | total across heads |
 |---|---|---|---|
 | complex+NoPE s0/s1/s2 | 0.04 | 0.04-0.05 | 0.40-0.42 |
-| complex+NoPE (no input phase) | **1.00** | 0.20 | 0.50 |
-| real+NoPE d224 s0/s1/s2 | **1.00** | 0.32-0.66 | 1.31-2.49 |
+| complex+NoPE (no input phase) | **1.00** | 0.19 | 0.50 |
+| real+NoPE d224 s0/s1/s2 | **0.96-1.00** | 0.32-0.67 | 1.31-2.51 |
 
 The parameter-matched real models, which score 0.41, route **more** cleanly than the complex models,
 which score 0.86; and full complex has no staircase head at all while its own ablation has a perfect
@@ -597,18 +607,29 @@ attention in both measurements we have. Artifacts: `results/_figs/act/activation
 
 ### Coverage & next runs
 
-- **Unity 5-seed sweep: DONE. Ablation + d160 probe: DONE** (above). Results committed; figures in
-  `paper/figs/` via `scripts/make_paper_figs.py`; numbers via `experiments/stats.py`. The paper's two
-  TODO markers are filled; no runs are staged.
+- **Round one: DONE** (140-run sweep + 20-run ablation + d160 phase probe). **Round two: DONE**
+  (15 weight-tying, 20 offset-law, 15 width scan, 40 learning-rate grid, 20 needle re-evaluations,
+  plus the activation probe). 270 runs total, all `result.json` committed. Figures in `paper/figs/`
+  via `scripts/make_paper_figs.py`; numbers via `experiments/stats.py`. No runs are staged.
 - The d64/d128 probe artifacts remain lost (numbers survive only in the tables above); the d160
-  probe artifacts are the committed evidence base for the probe claims.
+  probe artifacts are the committed evidence base for the probe claims. The paper now discloses this
+  where it claims three scales, so a reader knows which of the three they can check.
+- Open directions, with the decisive experiment for each, are in
+  [`next-directions.md`](next-directions.md).
 - **Dashboard:** `uv run marimo edit notebooks/03_analysis.py` renders all of the above (results, the
   mechanistic probe, an animated attention-retrieval view, and a live-training cell); results refresh as
   sweep runs land.
 
 ---
 
-## Hypothesis verdict, FINAL (Unity 5-seed sweep 2026-07-09 + ablation/probe 2026-07-10)
+## Hypothesis verdict, ROUND ONE (Unity 5-seed sweep 2026-07-09 + ablation/probe 2026-07-10)
+
+> **Superseded in part by round two. Read this section for what round one established, then read
+> [Verdict after round two](#verdict-after-round-two-2026-07-28) for the two attributions it got wrong.**
+> Specifically: the attribution of the reverse effect to *complex weights* did not survive the
+> weight-tying ablation, and the rejection of H1_comp did not survive the width scan. Every measured
+> number below still stands; two of the conclusions drawn from them do not. It is kept in full, rather
+> than rewritten, because the point of this log is to show what we believed on what evidence and when.
 
 Measured against the falsification table in `hypothesis.md`. This supersedes the preliminary GTX 1050
 verdict (see git history for the pre-Unity reading, which rested on n=1 sort and enhancer effects that
@@ -631,9 +652,16 @@ narrower than the pilot suggested.**
 - *Attribution is closed:* the learn_imag ablation leaves reverse unchanged (0.84 ± 0.06 vs
   0.86 ± 0.02, p = 0.68) and still beats the d224 control by the full margin; the effect belongs to
   the complex weights, not the learnable input phase.
+  **[Overturned by round two.]** The ablation correctly rules out the *input phase*. It does not rule
+  in *complex weights*, and H2_alg shows they are not the cause: a block-diagonal tying containing no
+  complex arithmetic reproduces the effect (0.830 ± 0.05, p = 0.31 vs complex).
 
 **Secondary, Compression (H1_comp): NOT supported, unchanged (F4).** Complex costs ~2x params at equal
 dim and buys nothing at matched params outside reverse.
+**[Reversed on reverse by round two.]** This verdict rests on the single d224 point and is
+under-powered on the parameter axis. The width scan puts the real curve at 0.65 (6.16M) and 0.81
+(12.06M) against complex's 0.856 at 3.09M, which is a genuine Pareto point on reverse. H1_comp is
+still not supported on the other five tasks.
 
 **Mechanistic (H1_mech): NOT supported (F3), confirmed at three scales** (d64, d128, and d160 on the
 decisive sweep checkpoints). QK entry-phase and eigenvalue-angle spectra are statistically uniform,
@@ -644,12 +672,63 @@ died under param matching; the pos_fraction asymmetry (C-RoPE > R-RoPE) was re-m
 persists against the d224 control (0.61 vs 0.37), but with no behavioral effect to explain it remains
 an uninterpreted observation.
 
-### Net for the user
+### Net for the user, ROUND ONE
 The literal idea (make weights complex, delete the positional module, save parameters) is falsified in
 mechanism and mostly falsified in behavior; what remains is one specific, robust capability: complex
 weights roughly **double exact-match length generalization on order reversal**, the task where retrieval
 must run against the causal order, and the effect survives both capacity controls (p <= 0.002) **and the
-learn_imag ablation**: it belongs to the complex weights themselves. The honest paper is: two negatives
-(no emergent phase structure at three scales; no general or enhancer advantage once params are matched)
-plus that one positive, plus the training recipe (CReLU; the learnable input phase turned out to be
-unnecessary at d160) that makes complex transformers converge reliably.
+learn_imag ablation**. The honest paper is: two negatives (no emergent phase structure at three scales;
+no general or enhancer advantage once params are matched) plus that one positive, plus the training
+recipe (CReLU; the learnable input phase turned out to be unnecessary at d160) that makes complex
+transformers converge reliably.
+
+*Round two changed the attribution in that paragraph. The behavioural effect is real and replicates;
+"it belongs to the complex weights themselves" does not. See below.*
+
+---
+
+## Verdict after round two (2026-07-28)
+
+This is the current verdict. It supersedes the round-one section above wherever the two disagree.
+
+**What is dead.**
+1. **The mechanism (H1_mech).** Trained complex QK weights carry no RoPE-like phase structure, at
+   three scales, including the exact checkpoints behind the behavioural effect. Falsified.
+2. **"Complex weights are special" (H2_alg, F6).** At identical width and identical parameter count,
+   split-complex (0.846, p = 0.70) and a block-diagonal control with *no cross-stream mixing and no
+   complex arithmetic at all* (0.830, p = 0.31) both reproduce the effect. Whatever reverse is about,
+   it is not `ℂ`.
+3. **"Unreachable by real width" (H2_width, F7).** A tuned real+NoPE model reaches 0.868 at d640. The
+   flat stretch that made the gap look like a wall was d160 and d224, the only two widths round one
+   sampled.
+4. **The offset law (H3_offset).** Length-independence of the retrieval offset does not predict where
+   the advantage appears. Two purpose-built tasks, neither significant, and the larger point estimate
+   sits on the *wrong* member of the pair.
+5. **The long-haystack needle prediction (H4_needle).** Re-scored to 1024, the complex ablation falls
+   fastest and the parameter-matched real baseline is ahead by 1024. Round one's "capacity artifact"
+   verdict is reinforced.
+6. **Both mechanistic predictions registered at the activation level (H1_mech_act).** The deep
+   rotation is real but anti-correlates with the outcome *within* a condition, and the attention
+   staircase runs backwards: the parameter-matched real models route more cleanly and score worse.
+
+**What survives.**
+- **The behaviour.** On reverse at 1.5x training length, complex+NoPE holds 0.856 ± 0.018 against
+  0.407 ± 0.085 for a *tuned* real+NoPE at equal parameters (p = 0.0002). This number has not moved
+  across two rounds and every control run against it.
+- **Its correct description: parameter efficiency, from a two-stream weight tying.** A tied model at
+  3.09M matches what an unconstrained real model needs ~12M to reach. The equal-*width* control
+  settles what the tying supplies: real d320 has the same activation width 320 with the tying removed,
+  costs 6.16M, and reaches only 0.654 ± 0.234. So width alone is not it. The tying buys that width at
+  half price, and buys it reliably.
+- **Reliability as a finding in its own right.** Complex sits at ± 0.018 across seeds where the wide
+  real baselines swing ± 0.090 to ± 0.234. This is why the significance boundary (2x) and the
+  point-estimate crossover (4x) disagree, and it is arguably the more useful half of the result.
+- **A measured positional code.** Every NoPE model builds a rotating subspace in its early blocks, and
+  it encodes position as a *fraction* of the sequence rather than as an absolute count (total swept
+  angle invariant over a 4x length range). This is not complex-specific.
+- **The training recipe.** CReLU is the piece that matters. The learnable input phase is unnecessary
+  at d160. The d160-tuned learning rate does not transfer up the width axis.
+
+**Scope, stated plainly.** One task out of six. Synthetic data, 5-layer models, 3M to 25M parameters.
+The claim is about parameter efficiency of a weight-sharing pattern, not about complex numbers, and
+not about transformers at scale.

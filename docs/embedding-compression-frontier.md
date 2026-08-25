@@ -2,13 +2,13 @@
 
 The user asked to step back from complex numbers specifically and ask whether **compressing the
 embedding / positional machinery** has real value in current DL/AI research. Short answer: **yes, but
-unevenly** — it is a major lever for small/edge/recursive models and a live (not settled) research area,
+unevenly**: it is a major lever for small/edge/recursive models and a live (not settled) research area,
 while it matters less for the largest models where embeddings are a small parameter fraction.
 
 ---
 
 ## 1. Why embeddings are a compression target
-The token-embedding + unembedding matrices are `vocab × d` each — often the **single largest parameter
+The token-embedding + unembedding matrices are `vocab × d` each, often the **single largest parameter
 block in small models**:
 - ~**73%** of parameters in Pythia-70M are embeddings; the share shrinks to ~**9%** by 2.8B.
 - So for **tiny models** (TRM ≈ 7M params, on-device models, recursive reasoners), shrinking the
@@ -18,30 +18,30 @@ This is exactly why the complex-weight idea has the **most leverage in the tiny/
 motivated the project (`background.md` §7).
 
 ## 2. The standard compression toolbox (real-valued, today's frontier)
-- **Weight tying** — share input & output embeddings (GPT-2/BERT/Gemma). Big saving for small models;
+- **Weight tying**: share input & output embeddings (GPT-2/BERT/Gemma). Big saving for small models;
   recent large models (Llama-3, OLMo-2, Qwen3) increasingly **untie** because the bias it imposes hurts at
   scale ("Weight Tying Biases Token Embeddings Toward the Output Space", 2026).
-- **Factorized embeddings** — ALBERT-style `vocab×r · r×d` low-rank factorization; decouples vocab size
+- **Factorized embeddings**: ALBERT-style `vocab×r · r×d` low-rank factorization; decouples vocab size
   from hidden size.
-- **Low-rank / tensor-train / Kronecker** — structured factorizations of the embedding matrix
+- **Low-rank / tensor-train / Kronecker**: structured factorizations of the embedding matrix
   (TensorSLM, 2025).
-- **Vector quantization / residual VQ** — store embeddings as codebook indices (CARVQ, 2025).
-- **Per-layer / n-gram embeddings, vocabulary customization** — densify information per token.
+- **Vector quantization / residual VQ**: store embeddings as codebook indices (CARVQ, 2025).
+- **Per-layer / n-gram embeddings, vocabulary customization**: densify information per token.
 
 Counter-current: **"Scaling Embeddings Outperforms Scaling Experts"** (2026) and **"Scaling Embedding
-Layers"** (2025) argue bigger embeddings can be *better* spent compute than more experts — i.e., the
+Layers"** (2025) argue bigger embeddings can be *better* spent compute than more experts, i.e. the
 community is actively re-pricing embeddings, not treating them as fixed overhead. Compression and scaling
 are two sides of the same live question: **how many parameters does token/position representation deserve?**
 
 ## 3. The *positional* machinery specifically
 - **RoPE adds zero parameters** but costs compute and **bounds context** (the base frequency caps usable
-  length — "Base of RoPE Bounds Context Length", NeurIPS 2024). So the cost is *compute + capability*, not
+  length; see "Base of RoPE Bounds Context Length", NeurIPS 2024). So the cost is *compute + capability*, not
   parameters.
-- **NoPE removes explicit PE entirely** and often matches/beats it on length generalization — the existence
+- **NoPE removes explicit PE entirely** and often matches/beats it on length generalization, which is the existence
   proof that positional *parameters/modules* are not strictly necessary.
 - **CRoPE** (preprint) reparametrizes attention in `ℂ` and claims **~50% attention-block parameter
   reduction**, framing RoPE as "reserving half the embedding space for position." If true, that is direct
-  evidence that positional capability can be **folded into weights** at a real parameter saving — the exact
+  evidence that positional capability can be **folded into weights** at a real parameter saving, the exact
   bet of this project. We can validate it.
 
 ## 4. Where complex weights fit on this map

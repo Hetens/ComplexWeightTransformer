@@ -71,6 +71,16 @@ DEFAULT_RUNS = [
     # ran with save_model=False, so this is an independent retrain of the same seed-0 recipe
     # (seq@24 = 0.84 locally vs 0.883 on the cluster; not bit-identical across GPUs).
     ("local_reverse_complex_none_d160_diag_s0", "C-diag s0 (block-diagonal)"),
+    # Positive control for the fractional-position reading. The NoPE runs above hold their *total*
+    # swept angle fixed as the sequence grows, which we read as "the rotation encodes position as a
+    # fraction of the sequence, not as an absolute count". That reading rests on a null (omega does
+    # not stay fixed), so it is only trustworthy if the same statistic can see a fixed-frequency code
+    # when one is definitely present. RoPE conditions are handed exactly that by construction, so
+    # they are the control: if omega falls like 1/T here too, the statistic cannot tell the two codes
+    # apart and the claim dies. n=1 seed each, so these fix the *sign* of the effect, not its size.
+    ("unity_reverse_real_rope_d160_s0", "R-RoPE d160 s0 (positive control)"),
+    ("unity_reverse_real_rope_d224_matched_s0", "R-RoPE d224 s0 (positive control)"),
+    ("unity_reverse_complex_rope_d160_s0", "C-RoPE d160 s0 (positive control)"),
 ]
 
 
