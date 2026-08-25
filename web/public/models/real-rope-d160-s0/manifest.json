@@ -1,0 +1,282 @@
+{
+ "id": "real-rope-d160-s0",
+ "label": "real+RoPE d160",
+ "config": {
+  "field": "real",
+  "pe": "rope",
+  "dim": 160,
+  "n_layers": 5,
+  "n_heads": 4,
+  "mlp_ratio": 4.0,
+  "learn_imag": false,
+  "algebra": null,
+  "complex_act": "crelu",
+  "rope_base": 10000.0,
+  "n_symbols": 16,
+  "task": "reverse",
+  "train_min": 6,
+  "train_max": 16
+ },
+ "vocab_size": 19,
+ "real_params": 1543840,
+ "n_floats": 1543840,
+ "paper_seq_acc": {
+  "16": {
+   "length": 16,
+   "token_acc": 1.0,
+   "seq_acc": 1.0
+  },
+  "24": {
+   "length": 24,
+   "token_acc": 0.515625,
+   "seq_acc": 0.0
+  },
+  "32": {
+   "length": 32,
+   "token_acc": 0.29583740234375,
+   "seq_acc": 0.0
+  },
+  "48": {
+   "length": 48,
+   "token_acc": 0.203369140625,
+   "seq_acc": 0.0
+  },
+  "64": {
+   "length": 64,
+   "token_acc": 0.179901123046875,
+   "seq_acc": 0.0
+  },
+  "96": {
+   "length": 96,
+   "token_acc": 0.15358479817708334,
+   "seq_acc": 0.0
+  },
+  "128": {
+   "length": 128,
+   "token_acc": 0.1089324951171875,
+   "seq_acc": 0.0
+  }
+ },
+ "tensors": {
+  "tok.weight": {
+   "offset": 0,
+   "shape": [
+    19,
+    160
+   ]
+  },
+  "blocks.0.n1.weight": {
+   "offset": 3040,
+   "shape": [
+    160
+   ]
+  },
+  "blocks.0.attn.qkv.weight": {
+   "offset": 3200,
+   "shape": [
+    480,
+    160
+   ]
+  },
+  "blocks.0.attn.proj.weight": {
+   "offset": 80000,
+   "shape": [
+    160,
+    160
+   ]
+  },
+  "blocks.0.n2.weight": {
+   "offset": 105600,
+   "shape": [
+    160
+   ]
+  },
+  "blocks.0.mlp.fc1.weight": {
+   "offset": 105760,
+   "shape": [
+    640,
+    160
+   ]
+  },
+  "blocks.0.mlp.fc2.weight": {
+   "offset": 208160,
+   "shape": [
+    160,
+    640
+   ]
+  },
+  "blocks.1.n1.weight": {
+   "offset": 310560,
+   "shape": [
+    160
+   ]
+  },
+  "blocks.1.attn.qkv.weight": {
+   "offset": 310720,
+   "shape": [
+    480,
+    160
+   ]
+  },
+  "blocks.1.attn.proj.weight": {
+   "offset": 387520,
+   "shape": [
+    160,
+    160
+   ]
+  },
+  "blocks.1.n2.weight": {
+   "offset": 413120,
+   "shape": [
+    160
+   ]
+  },
+  "blocks.1.mlp.fc1.weight": {
+   "offset": 413280,
+   "shape": [
+    640,
+    160
+   ]
+  },
+  "blocks.1.mlp.fc2.weight": {
+   "offset": 515680,
+   "shape": [
+    160,
+    640
+   ]
+  },
+  "blocks.2.n1.weight": {
+   "offset": 618080,
+   "shape": [
+    160
+   ]
+  },
+  "blocks.2.attn.qkv.weight": {
+   "offset": 618240,
+   "shape": [
+    480,
+    160
+   ]
+  },
+  "blocks.2.attn.proj.weight": {
+   "offset": 695040,
+   "shape": [
+    160,
+    160
+   ]
+  },
+  "blocks.2.n2.weight": {
+   "offset": 720640,
+   "shape": [
+    160
+   ]
+  },
+  "blocks.2.mlp.fc1.weight": {
+   "offset": 720800,
+   "shape": [
+    640,
+    160
+   ]
+  },
+  "blocks.2.mlp.fc2.weight": {
+   "offset": 823200,
+   "shape": [
+    160,
+    640
+   ]
+  },
+  "blocks.3.n1.weight": {
+   "offset": 925600,
+   "shape": [
+    160
+   ]
+  },
+  "blocks.3.attn.qkv.weight": {
+   "offset": 925760,
+   "shape": [
+    480,
+    160
+   ]
+  },
+  "blocks.3.attn.proj.weight": {
+   "offset": 1002560,
+   "shape": [
+    160,
+    160
+   ]
+  },
+  "blocks.3.n2.weight": {
+   "offset": 1028160,
+   "shape": [
+    160
+   ]
+  },
+  "blocks.3.mlp.fc1.weight": {
+   "offset": 1028320,
+   "shape": [
+    640,
+    160
+   ]
+  },
+  "blocks.3.mlp.fc2.weight": {
+   "offset": 1130720,
+   "shape": [
+    160,
+    640
+   ]
+  },
+  "blocks.4.n1.weight": {
+   "offset": 1233120,
+   "shape": [
+    160
+   ]
+  },
+  "blocks.4.attn.qkv.weight": {
+   "offset": 1233280,
+   "shape": [
+    480,
+    160
+   ]
+  },
+  "blocks.4.attn.proj.weight": {
+   "offset": 1310080,
+   "shape": [
+    160,
+    160
+   ]
+  },
+  "blocks.4.n2.weight": {
+   "offset": 1335680,
+   "shape": [
+    160
+   ]
+  },
+  "blocks.4.mlp.fc1.weight": {
+   "offset": 1335840,
+   "shape": [
+    640,
+    160
+   ]
+  },
+  "blocks.4.mlp.fc2.weight": {
+   "offset": 1438240,
+   "shape": [
+    160,
+    640
+   ]
+  },
+  "norm_f.weight": {
+   "offset": 1540640,
+   "shape": [
+    160
+   ]
+  },
+  "head.weight": {
+   "offset": 1540800,
+   "shape": [
+    19,
+    160
+   ]
+  }
+ }
+}

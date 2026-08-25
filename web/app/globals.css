@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+/**
+ * Surfaces and ink follow the paper's companion page (paper/answers/index.html) so the two read as
+ * one publication. The series hues are the paper's own figure assignment (scripts/make_paper_figs.py),
+ * which is the validated categorical palette: blue slot 1, yellow slot 4, green slot 6, aqua slot 3.
+ * Colour follows the entity, so complex+NoPE is blue in the PDF and blue here.
+ *
+ * Dark steps are selected for the dark surface, not flipped. On that surface the yellow/green pair
+ * sits at CVD delta-E 6.9, inside the 6-8 band that is legal only with secondary encoding, so every
+ * series on this page carries a direct label and the paper's dash pattern as well as its hue.
+ */
+:root {
+  color-scheme: light;
+  --bg: #fbfaf8;
+  --surface-1: #fcfcfb;
+  --card: #ffffff;
+  --rule: #e2ded7;
+  --grid: #e1e0d9;
+  --text-primary: #1a1a1a;
+  --text-secondary: #52514e;
+  --text-muted: #7d7b74;
+  --accent: #7a4c2e;
+  --code-bg: #f2efe9;
+
+  --series-complex: #2a78d6;
+  --series-real: #eda100;
+  --series-rope: #008300;
+  --series-alt: #1baf7a;
+  --series-violet: #4a3aa7;
+  --null: #898781;
+
+  /* Sequential ramp for position on the dial: one hue, light to dark on the light surface. */
+  --ramp-lo: #a9c8ec;
+  --ramp-hi: #10386c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --bg: #16181c;
+    --surface-1: #1a1a19;
+    --card: #1b1e23;
+    --rule: #2c3038;
+    --grid: #2a2e35;
+    --text-primary: #f2f2f0;
+    --text-secondary: #b6b5ae;
+    --text-muted: #8b8a83;
+    --accent: #e0a678;
+    --code-bg: #21252b;
+
+    --series-complex: #3987e5;
+    --series-real: #c98500;
+    --series-rope: #008300;
+    --series-alt: #199e70;
+    --series-violet: #9085e9;
+    --null: #6f6e69;
+
+    /* Selected for the dark surface, not flipped: the ramp runs dark to light so the late positions
+       stay legible instead of sinking into the background. */
+    --ramp-lo: #3f5f8c;
+    --ramp-hi: #cde2fc;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-card: var(--card);
+  --color-rule: var(--rule);
+  --color-ink: var(--text-primary);
+  --color-ink-2: var(--text-secondary);
+  --color-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --font-serif: ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Numbers in tables and readouts must not reflow as they update. */
+.tnum { font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
