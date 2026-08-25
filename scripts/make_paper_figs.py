@@ -19,18 +19,20 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
+from matplotlib.lines import Line2D
+
 from experiments.analysis import load_results
 
 # entity -> (label, hex, dash) ; fixed assignment, never cycled
 INK, INK2, MUTED, GRID, BASE = "#0b0b0b", "#52514e", "#898781", "#e1e0d9", "#c3c2b7"
 SERIES = {
     ("complex+none", 160): ("complex+NoPE", "#2a78d6", "-"),
-    ("complex+none-noimag", 160): ("complex+NoPE (no input phase)", "#2a78d6", (0, (1, 1.5))),
+    ("complex+none-noimag", 160): ("complex+NoPE (no input phase)", "#2a78d6", (0, (0.01, 3.0))),
     ("complex+rope", 160): ("complex+RoPE", "#1baf7a", "-"),
     ("real+none", 160): ("real+NoPE", "#eda100", "-"),
-    ("real+none", 224): ("real+NoPE (d224 matched)", "#eda100", (0, (4, 2))),
+    ("real+none", 224): ("real+NoPE (d224 matched)", "#eda100", (0, (3.4, 1.5))),
     ("real+rope", 160): ("real+RoPE", "#008300", "-"),
-    ("real+rope", 224): ("real+RoPE (d224 matched)", "#008300", (0, (4, 2))),
+    ("real+rope", 224): ("real+RoPE (d224 matched)", "#008300", (0, (3.4, 1.5))),
     ("real+learned", 160): ("real+learned", "#4a3aa7", "-"),
 }
 TASK_ORDER = ("reverse", "copy", "sort", "needle")
@@ -43,6 +45,23 @@ plt.rcParams.update({
     "xtick.color": MUTED, "ytick.color": MUTED, "text.color": INK,
     "axes.labelcolor": INK2, "figure.dpi": 200, "savefig.bbox": "tight",
 })
+
+
+def _line_only(handle):
+    """A marker-free copy of a plot handle, for legends.
+
+    The legend handle is ~2-3 dash cycles long. Matplotlib centres the marker inside it, which lands
+    on the gap and makes a dashed entry read as solid: the very entry whose only job is to tell the
+    reader that this series is dashed."""
+    from matplotlib.lines import Line2D
+    # get_linestyle() returns the *style string* ("--") for a custom dash tuple and drops the pattern,
+    # which silently collapses every dashed series in the legend onto one generic dash. The pattern in
+    # force lives in _dash_pattern as (offset, onoffseq); copy that so the legend shows what was drawn.
+    out = Line2D([], [], color=handle.get_color(), linewidth=handle.get_linewidth(),
+                 dash_capstyle=handle.get_dash_capstyle())
+    offset, seq = handle._dash_pattern
+    out.set_linestyle("-" if seq is None else (offset, tuple(seq)))
+    return out
 
 
 def _style_axis(ax):
@@ -61,7 +80,7 @@ def fig_acc_vs_length(df, metric: str = "seq_acc"):
             if not len(g):
                 continue
             ax.plot(g.length, g["mean"], color=color, linestyle=dash, linewidth=1.4,
-                    marker="o", markersize=2.6, label=label)
+                    marker="o", markersize=2.6, label=label, dash_capstyle="round")
             ax.fill_between(g.length, g["mean"] - g["std"].fillna(0),
                             g["mean"] + g["std"].fillna(0), color=color, alpha=0.12, linewidth=0)
         ax.axvline(TRAIN_MAX, color=BASE, linewidth=0.8, linestyle=(0, (2, 2)))
@@ -78,8 +97,9 @@ def fig_acc_vs_length(df, metric: str = "seq_acc"):
     for ax in axes[:, 0]:
         ax.set_ylabel("exact-match accuracy")
     handles, labels = axes[0, 0].get_legend_handles_labels()
+    handles = [_line_only(h) for h in handles]
     fig.legend(handles, labels, loc="lower center", ncol=4, frameon=False,
-               bbox_to_anchor=(0.5, -0.06), labelcolor=INK2)
+               bbox_to_anchor=(0.5, -0.06), labelcolor=INK2, handlelength=3.6)
     fig.tight_layout(h_pad=1.2)
     return fig
 
@@ -273,7 +293,7 @@ def fig_needle_long(df):
         if not len(g) or g.length.max() <= 128:
             continue
         ax.plot(g.length, g["mean"], color=color, linestyle=dash, linewidth=1.4, marker="o",
-                markersize=2.6, label=label)
+                markersize=2.6, label=label, dash_capstyle="round")
         ax.fill_between(g.length, g["mean"] - g["std"].fillna(0), g["mean"] + g["std"].fillna(0),
                         color=color, alpha=0.12, linewidth=0)
     ax.axvline(TRAIN_MAX, color=BASE, linewidth=0.8, linestyle=(0, (2, 2)))
@@ -286,7 +306,9 @@ def fig_needle_long(df):
     ax.set_ylabel("retrieval accuracy")
     ax.set_title("needle, re-evaluated to 1024", color=INK, fontweight="bold", fontsize=8)
     _style_axis(ax)
-    ax.legend(frameon=False, fontsize=6.2, loc="lower left", labelcolor=INK2)
+    h, l = ax.get_legend_handles_labels()
+    ax.legend([_line_only(x) for x in h], l, frameon=False, fontsize=6.2, loc="lower left",
+              labelcolor=INK2, handlelength=3.6)
     fig.tight_layout()
     return fig
 
@@ -325,13 +347,13 @@ def fig_probe_depth(metrics_path: Path, L: int = 24):
         elif label.startswith("C-"):
             color, style = "#2a78d6", "-"
         else:
-            color, style = ("#eda100" if "d160" in label else "#b06a00"), (0, (4, 2))
+            color, style = ("#eda100" if "d160" in label else "#b06a00"), (0, (3.4, 1.5))
         ax.plot(range(len(r2)), r2, color=color, linewidth=1.3, marker="o", markersize=2.6,
                 alpha=0.85, linestyle=style)
     ax.plot([], [], color="#2a78d6", linewidth=1.3, label="complex+NoPE")
     ax.plot([], [], color="#d1495b", linewidth=1.3, linestyle=(0, (1, 1.5)), label="block-diagonal")
-    ax.plot([], [], color="#eda100", linewidth=1.3, linestyle=(0, (4, 2)), label="real+NoPE d160")
-    ax.plot([], [], color="#b06a00", linewidth=1.3, linestyle=(0, (4, 2)), label="real+NoPE d224")
+    ax.plot([], [], color="#eda100", linewidth=1.3, linestyle=(0, (3.4, 1.5)), label="real+NoPE d160")
+    ax.plot([], [], color="#b06a00", linewidth=1.3, linestyle=(0, (3.4, 1.5)), label="real+NoPE d224")
     ax.set_ylim(-0.03, 1.05)
     ax.set_xticks(range(n_blocks))
     ax.set_xlabel("residual stream at block input")
@@ -339,8 +361,111 @@ def fig_probe_depth(metrics_path: Path, L: int = 24):
     ax.set_title(f"positional rotation by depth (reverse, L={L})", color=INK, fontweight="bold",
                  fontsize=8)
     _style_axis(ax)
-    ax.legend(frameon=False, fontsize=6.2, loc="lower left", labelcolor=INK2)
+    ax.legend(frameon=False, fontsize=6.2, loc="lower left", labelcolor=INK2, handlelength=3.6)
     fig.tight_layout()
+    return fig
+
+
+# Sequential blue ramp (dataviz reference palette, steps 100->700). Position is an *ordered magnitude*
+# here, not an identity, so it gets a one-hue sequential ramp rather than categorical slots.
+POS_RAMP = ["#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5", "#256abf", "#184f95", "#0d366b"]
+
+
+def fig_fraction_code(results_dir: str = "results", lengths=(16, 24)):
+    """The rotating-plane probe drawn out: what it measures (top row), and what it finds (bottom).
+
+    Top: each dot is one token position's mean residual stream at the deepest block, projected on
+    that stream's own top-two principal plane. The probe fits the unwrapped in-plane angle against
+    position; that is the whole method.
+    Bottom: the same angle, unwrapped, against position. complex+NoPE sweeps the same total angle at
+    both evaluation lengths and simply turns more slowly in the longer one, which is a
+    fraction-of-sequence code. The real+RoPE control, handed a fixed-frequency code by construction,
+    holds its rate and sweeps proportionally further. Nothing is fitted for the figure: these are the
+    projections that activation_probe.py scores.
+    """
+    import matplotlib.colors as mcolors
+    import torch
+    from experiments.activation_probe import residual_by_position
+    from experiments.data.tasks import TaskConfig, make_batch
+    from experiments.phase_probe import load_run
+
+    runs = (("complex+NoPE", "unity_reverse_complex_none_d160_s0", "#2a78d6"),
+            ("real+RoPE (positive control)", "unity_reverse_real_rope_d160_s0", "#008300"))
+    traj = {}
+    for label, tag, _ in runs:
+        run = load_run(Path(results_dir) / tag, label)
+        if run is None:
+            return None
+        for L in lengths:
+            task = TaskConfig(run.task.name, run.task.n_symbols, run.task.train_min,
+                              run.task.train_max, run.task.eval_lengths)
+            gen = torch.Generator().manual_seed(0)
+            X, _, _ = make_batch(task, 512, L, L, device="cpu", generator=gen)
+            H = residual_by_position(run.model.eval(), X)[-1]      # deepest block input
+            Hc = H - H.mean(axis=0, keepdims=True)
+            U, S, _ = np.linalg.svd(Hc, full_matrices=False)
+            pts = U[:, :2] * S[:2]
+            ang = np.unwrap(np.arctan2(pts[:, 1], pts[:, 0]))
+            m = np.arange(len(ang), dtype=float)
+            # the least-squares line the probe actually scores; its rise over the sequence is the
+            # `total_sweep_rad` quoted in the text, so the figure and the table cannot drift apart
+            A = np.stack([m, np.ones_like(m)], axis=1)
+            coef, *_ = np.linalg.lstsq(A, ang, rcond=None)
+            traj[(label, L)] = (pts, np.abs(ang - ang[0]), np.abs((A @ coef) - coef[1]))
+
+    cmap = mcolors.LinearSegmentedColormap.from_list("pos", POS_RAMP)
+    fig, axes = plt.subplots(2, 2, figsize=(6.4, 4.0))
+
+    for ax, L, tag in zip(axes[0], lengths, "ab"):
+        pts = traj[("complex+NoPE", L)][0]
+        T = len(pts)
+        ax.plot(pts[:, 0], pts[:, 1], color=BASE, linewidth=0.7, zorder=1)
+        ax.scatter(pts[:, 0], pts[:, 1], c=np.arange(T), cmap=cmap, s=14, zorder=2,
+                   edgecolor="white", linewidth=0.35)
+        ax.set_title(f"({tag}) complex+NoPE, length {L}", color=INK, fontweight="bold",
+                     fontsize=7.5)
+        ax.set_xlabel("PC 1", labelpad=1.5)
+        ax.set_xticks([]); ax.set_yticks([])
+        # Equal aspect, so a rotation reads as a rotation; explicit padded limits, so the two end
+        # labels have room and cannot land on the title or the axis label.
+        pad = 0.24 * max(np.ptp(pts[:, 0]), np.ptp(pts[:, 1]))
+        ax.set_xlim(pts[:, 0].min() - pad, pts[:, 0].max() + pad)
+        ax.set_ylim(pts[:, 1].min() - pad, pts[:, 1].max() + pad)
+        ax.set_aspect("equal", adjustable="box")
+        for sp in ax.spines.values():
+            sp.set_visible(False)
+        # Direct labels on the two ends: only the ends of the ramp carry meaning, so a colorbar
+        # would spend a legend's worth of space saying less.
+        c = pts[:, :2].mean(axis=0)
+        for idx in (0, T - 1):
+            # push each end label radially outward, so neither lands on the trajectory or the title
+            v = pts[idx] - c
+            v = v / max(np.hypot(*v), 1e-9) * 13
+            ax.annotate(f"pos {idx}", pts[idx], textcoords="offset points", xytext=tuple(v),
+                        ha="center", va="center", fontsize=6, color=INK2)
+    axes[0, 0].set_ylabel("PC 2", labelpad=1.5)
+
+    for ax, (label, _, color), tag in zip(axes[1], runs, "cd"):
+        for L, dash in zip(lengths, ["-", (0, (3.4, 1.5))]):
+            _, a, fit = traj[(label, L)]
+            m = np.arange(len(a))
+            ax.plot(m, a, color=color, linestyle=dash, linewidth=1.4)
+            ax.plot(m, fit, color=MUTED, linewidth=0.7, zorder=0)
+            ax.annotate(f"{fit[-1]:.1f} rad", (m[-1], fit[-1]), textcoords="offset points",
+                        xytext=(-2, 3), ha="right", fontsize=6, color=INK2)
+        ax.set_xlabel("token position $m$", labelpad=1.5)
+        ax.set_title(f"({tag}) {label.split(' (')[0]}", color=INK, fontweight="bold", fontsize=7.5)
+        top = max(traj[(label, L)][1].max() for L in lengths)
+        ax.set_ylim(0, top * 1.34)
+        _style_axis(ax)
+        h = [Line2D([], [], color=color, linewidth=1.4),
+             Line2D([], [], color=color, linewidth=1.4, linestyle=(0, (3.4, 1.5))),
+             Line2D([], [], color=MUTED, linewidth=0.7)]
+        ax.legend(h, [f"eval length {lengths[0]}", f"eval length {lengths[1]}", "fitted line"],
+                  frameon=False, fontsize=6, loc="upper left", labelcolor=INK2, handlelength=3.0,
+                  borderpad=0.1, labelspacing=0.3)
+    axes[1, 0].set_ylabel("angle swept from $m{=}0$ (rad)", labelpad=1.5)
+    fig.tight_layout(h_pad=1.0, w_pad=1.4)
     return fig
 
 
@@ -356,6 +481,7 @@ def main(results_dir: str = "results", out_dir: str = "paper/figs") -> None:
         ("fig_offset_law", fig_offset_law(df)),
         ("fig_needle_long", fig_needle_long(df)),
         ("fig_probe_depth", fig_probe_depth(Path(results_dir) / "_figs/act/activation_metrics.json")),
+        ("fig_fraction_code", fig_fraction_code(results_dir)),
     ]
     for name, fig in figs:
         if fig is None:
