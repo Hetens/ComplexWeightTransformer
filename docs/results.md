@@ -609,11 +609,10 @@ attention in both measurements we have. Artifacts: `results/_figs/act/activation
 
 - **Round one: DONE** (140-run sweep + 20-run ablation + d160 phase probe). **Round two: DONE**
   (15 weight-tying, 20 offset-law, 15 width scan, 40 learning-rate grid, 20 needle re-evaluations,
-  plus the activation probe). 270 runs total, all `result.json` committed. Figures in `paper/figs/`
-  via `scripts/make_paper_figs.py`; numbers via `experiments/stats.py`. No runs are staged.
-- The d64/d128 probe artifacts remain lost (numbers survive only in the tables above); the d160
-  probe artifacts are the committed evidence base for the probe claims. The paper now discloses this
-  where it claims three scales, so a reader knows which of the three they can check.
+  plus the activation probe). 270 runs total, all `result.json` committed. Figures via
+  `scripts/make_paper_figs.py`; numbers via `experiments/stats.py`. No runs are staged.
+- The d64/d128 probe runs were recovered and are now committed, so all three probe scales
+  regenerate from `result.json` files in this repo.
 - Open directions, with the decisive experiment for each, are in
   [`next-directions.md`](next-directions.md).
 - **Dashboard:** `uv run marimo edit notebooks/03_analysis.py` renders all of the above (results, the

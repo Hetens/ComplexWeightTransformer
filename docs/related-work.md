@@ -2,8 +2,8 @@
 
 Short, working bibliography (the "later: long" version will expand annotations and verify every link).
 Status flags matter here: several of the closest results are **withdrawn / preprint / workshop**, which is
-what creates room for this project. Every entry cited in `paper/references.bib` was verified against its
-arXiv abstract page on 2026-08-22; see `paper/README.md` for what was wrong and what changed.
+what creates room for this project. Every entry cited by the paper was verified against its
+arXiv abstract page on 2026-08-22.
 
 ---
 

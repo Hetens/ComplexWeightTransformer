@@ -70,3 +70,6 @@ paper/main.pdf
 
 # OS
 .DS_Store
+
+# Paper sources are kept out of this repo; it holds the reproduction code only.
+paper/

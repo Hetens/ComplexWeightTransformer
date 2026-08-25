@@ -126,7 +126,9 @@ uv run python -m experiments.activation_probe --lengths 16 24 32 48 64
 | `scripts/` | `smoke_test.sh` (local GTX 1050), Unity SLURM sbatch scripts: `unity_sweep` / `unity_ablation` (round one), `unity_followup` / `unity_width_lr` / `unity_complex_lr` (round two) |
 | `docs/` | persistent knowledge base + results writeup |
 | `results/` | sweep metric JSONs and probe metrics (committed); checkpoints/figures gitignored |
-| `paper/` | NeurIPS-style writeup (`main.tex`), figures via `scripts/make_paper_figs.py` |
+
+The paper sources are kept outside this repo, which holds the reproduction code only.
+`scripts/make_paper_figs.py` writes its figures to a local, untracked `paper/figs/`.
 
 ## Compute
 

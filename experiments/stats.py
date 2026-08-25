@@ -1,6 +1,6 @@
 """Statistical summary of the multi-seed sweep, aligned to the pre-registration in docs/hypothesis.md.
 
-Every number in paper/main.tex Tables 1-2 and the claim verdicts in docs/results.md comes from here:
+Every number in the paper's Tables 1-2 and the claim verdicts in docs/results.md comes from here:
 
     uv run python -m experiments.stats                    # console summary
     uv run python -m experiments.stats --out-md paper/numbers.md
