@@ -1,7 +1,14 @@
 # Interactive companion to *Phase Without Position*
 
-A static site that runs the paper's trained transformers in the reader's browser. Deploys to Vercel
-with **Root Directory = `web`**; there is no server component and no API route.
+**Live: <https://web-one-theta-88.vercel.app/>**
+
+A static site that runs the paper's trained transformers in the reader's browser. There is no server
+component and no API route.
+
+Deployed from this directory, with the Vercel project's **Root Directory set to `web`**. That setting
+is required, not cosmetic: `package.json` is here rather than at the repository root, so a build
+started from the root finds nothing to build. Pushes to `main` deploy production; other branches get
+preview URLs, which are behind Vercel Authentication while production is public.
 
 ## What is live and what is committed
 

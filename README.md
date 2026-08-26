@@ -76,6 +76,14 @@ makes that width cheap, and reliable.)
 - **Training recipe:** CReLU is the piece that matters; the d160-tuned lr does *not* transfer up the
   width axis (real d640 fails to train at all at 2e-3 and reaches 0.87 at 5e-4).
 
+## Play with it
+
+An interactive companion runs the trained `reverse` checkpoints in the browser, with no server:
+<https://web-one-theta-88.vercel.app/>. It covers the length-generalization result, the fractional
+positional code of the mechanism section, and the randomization test behind it. Every number on the
+page that is not labelled as coming from the paper is computed live by the checkpoints themselves.
+Source and rebuild instructions in [`web/`](web/README.md).
+
 ## What this is
 
 Capability-first study comparing **complex-NoPE** transformers against **real+RoPE**, **real+NoPE**,
