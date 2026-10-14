@@ -37,6 +37,10 @@ results/_figs/d160/*
 !results/_figs/act/
 results/_figs/act/*
 !results/_figs/act/activation_metrics.json
+!results/_figs/clock/
+results/_figs/clock/*
+!results/_figs/clock/clock_metrics.json
+!results/_figs/clock/clock_metrics_10k.json
 # the d64 (2-layer) and d128 (4-layer) probe runs: same rule as unity_*, metrics tracked and
 # checkpoints ignored. These two scales were reported as unreproducible in an earlier draft; the
 # runs were recovered, so all three probe scales now regenerate from the committed files.
@@ -46,6 +50,14 @@ results/probe_*/*
 !results/probe2_*/
 results/probe2_*/*
 !results/probe2_*/result.json
+# round three (scripts/unity_clock.sbatch): checkpointed reverse retrains for the clock-causal probe,
+# and the 30k-step training-duration control. Same rule: metrics tracked, checkpoints ignored.
+!results/clock_*/
+results/clock_*/*
+!results/clock_*/result.json
+!results/long_*/
+results/long_*/*
+!results/long_*/result.json
 experiments/data/cache/
 *.pt
 *.ckpt

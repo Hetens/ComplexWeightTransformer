@@ -366,6 +366,69 @@ def fig_probe_depth(metrics_path: Path, L: int = 24):
     return fig
 
 
+def fig_clock_segments(metrics_path: Path, min_r2: float = 0.75):
+    """The positional clock split at SEP, from experiments.clock_causal (one line per run).
+
+    Left: input-segment angle vs position at the longest evaluation length, in the clock plane fitted
+    at the training length. Under a causal mask these states cannot depend on L, and the angle rises
+    fast inside the training range and flattens outside it: a saturating absolute code.
+    Right: answer-segment sweep vs evaluation length. After SEP the length is knowable, and the sweep
+    stays constant: a fractional code. Answer points whose angle fit is below min_r2 are dropped.
+    """
+    if not metrics_path.exists():
+        return None
+    import json
+    m = json.loads(metrics_path.read_text())
+    style = {"complex": ("#2a78d6", "-", "complex+NoPE"),
+             "diag": ("#d1495b", (0, (1, 1.5)), "block-diagonal"),
+             "d160": ("#eda100", (0, (3.4, 1.5)), "real+NoPE d160"),
+             "d224": ("#b06a00", (0, (3.4, 1.5)), "real+NoPE d224")}
+
+    def kind(name, cfg):
+        if cfg["field"] == "complex":
+            return "diag" if cfg.get("algebra") == "diag" else "complex"
+        return "d160" if cfg["dim"] == 160 else "d224"
+
+    fig, (axl, axr) = plt.subplots(1, 2, figsize=(7.0, 2.6))
+    for name, rec in m.items():
+        if rec["config"].get("steps", 10000) != 10000:
+            continue
+        color, ls, _ = style[kind(name, rec["config"])]
+        seg = rec["segments"]
+        ang = seg["input_angle_at_max_len"]
+        axl.plot(range(len(ang)), ang, color=color, linestyle=ls, linewidth=1.0, alpha=0.75)
+        xs, ys = [], []
+        for L, row in sorted(seg["per_length"].items(), key=lambda kv: int(kv[0])):
+            if row["answer_fixed"]["r2"] >= min_r2:
+                xs.append(int(L)); ys.append(row["answer_fixed"]["sweep_rad"])
+        if len(xs) >= 2:
+            axr.plot(xs, ys, color=color, linestyle=ls, linewidth=1.0, alpha=0.75, marker="o",
+                     markersize=2.4)
+    train_max = 16
+    axl.axvspan(0, train_max - 1, color=GRID, alpha=0.6, linewidth=0)
+    axl.text(train_max / 2, 0.97, "trained\npositions", ha="center", va="top", fontsize=6.5,
+             color=INK2, transform=axl.get_xaxis_transform())
+    axl.set_xlabel("input position $m$ (evaluation length 64)")
+    axl.set_ylabel("clock angle from $m=0$ (rad)")
+    axl.set_title("input segment: saturating", color=INK, fontweight="bold", fontsize=8)
+    axr.set_xscale("log", base=2)
+    axr.set_xticks([16, 24, 32, 48, 64]); axr.set_xticklabels(["16", "24", "32", "48", "64"])
+    axr.minorticks_off()
+    axr.set_ylim(0, None)
+    axr.set_xlabel("evaluation length")
+    axr.set_ylabel("answer-segment sweep (rad)")
+    axr.set_title("answer segment: fractional", color=INK, fontweight="bold", fontsize=8)
+    for ax in (axl, axr):
+        _style_axis(ax)
+    for key in ("complex", "diag", "d160", "d224"):
+        color, ls, label = style[key]
+        axr.plot([], [], color=color, linestyle=ls, linewidth=1.2, label=label)
+    axr.legend(frameon=False, fontsize=6.2, loc="center right", bbox_to_anchor=(1.0, 0.56),
+               labelcolor=INK2, handlelength=3.4)
+    fig.tight_layout()
+    return fig
+
+
 # Sequential blue ramp (dataviz reference palette, steps 100->700). Position is an *ordered magnitude*
 # here, not an identity, so it gets a one-hue sequential ramp rather than categorical slots.
 POS_RAMP = ["#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5", "#256abf", "#184f95", "#0d366b"]
@@ -482,6 +545,8 @@ def main(results_dir: str = "results", out_dir: str = "paper/figs") -> None:
         ("fig_needle_long", fig_needle_long(df)),
         ("fig_probe_depth", fig_probe_depth(Path(results_dir) / "_figs/act/activation_metrics.json")),
         ("fig_fraction_code", fig_fraction_code(results_dir)),
+        ("fig_clock_segments",
+         fig_clock_segments(Path(results_dir) / "_figs/clock/clock_metrics_10k.json")),
     ]
     for name, fig in figs:
         if fig is None:
