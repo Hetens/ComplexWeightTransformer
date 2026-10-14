@@ -5,6 +5,7 @@ import { EngineProvider } from "@/components/EngineProvider";
 import { FractionalClock } from "@/components/FractionalClock";
 import { LiveDemo } from "@/components/LiveDemo";
 import { NullTest } from "@/components/NullTest";
+import { ClockInstrument } from "@/components/figures/clock/ClockInstrument";
 import { Section } from "@/components/ui";
 
 export default function Page() {
@@ -55,20 +56,42 @@ export default function Page() {
         <Section
           id="clock"
           kicker="the mechanism, section 9"
-          title="The clock that runs slower on longer sequences"
+          title="The clock that seems to run slower on longer sequences"
           lede={
             <>
               If a NoPE model builds position at all, it must do so in the residual stream at run time.
               It does: average the residual stream over random content at each position, project on the
-              top-two principal plane, and the trajectory turns monotonically. The question is what kind
-              of clock it is. A fixed-rate code, which is what RoPE supplies, advances a fixed angle per
-              token, so the total sweep grows with the sequence. A fractional code holds the total sweep
-              fixed and slows the rate instead, encoding <em>how far through this sequence am I</em>{" "}
-              rather than a count of tokens. Drag the length slider and watch which number moves.
+              top-two principal plane, and the trajectory turns monotonically. A fixed-rate code, which is
+              what RoPE supplies, advances a fixed angle per token, so the total sweep grows with the
+              sequence. Fit one line to the whole sequence here and the opposite happens: drag the length
+              slider and the total sweep holds while the rate falls, which first read as a{" "}
+              <em>fractional</em> code. That reading turned out to blend two different codes, one on each
+              side of the separator; the next section takes them apart.
             </>
           }
         >
           <FractionalClock />
+        </Section>
+
+        <Section
+          id="two-clocks"
+          kicker="round three: the clock, split and ablated"
+          title="Two codes in one clock, and the tied models depend on theirs"
+          lede={
+            <>
+              Under a causal mask the state at input position <em>m</em> sees only tokens 0 to <em>m</em>, so
+              it cannot know how long the sequence will be, and it does not: across 20 retrained checkpoints
+              the input-side states are identical at every evaluation length, to sampling noise. Fitted
+              separately in one fixed plane, the input side is a <em>saturating</em> absolute code that
+              crowds every position past the training range together, and the answer side, where the
+              input length is known, is roughly fractional, cleanly so only in the two-stream models.
+              Removing the clock&rsquo;s plane breaks those models; removing a same-rank control plane
+              barely touches them. In real models both removals hurt about equally. Five seeds per
+              condition; these analyses were not pre-registered.
+            </>
+          }
+        >
+          <ClockInstrument />
         </Section>
 
         <Section

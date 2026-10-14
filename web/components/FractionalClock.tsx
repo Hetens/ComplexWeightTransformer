@@ -7,9 +7,10 @@
  * deepest block, projected on its own top-two principal plane and shaded light to dark with position.
  * Right, the same rotation unwrapped against position, with the fitted line whose slope is omega.
  *
- * Dragging the length slider is the finding: on a NoPE model omega shrinks like 1/T and the total
- * sweep stays put near 5.4 rad, so position is encoded as a fraction of the sequence rather than a
- * count of tokens. On the RoPE control the rate is pinned and the sweep grows instead.
+ * Dragging the length slider shows the whole-sequence statistic: on a NoPE model omega shrinks like
+ * 1/T and the total sweep stays near 5.4 rad, while on the RoPE control the rate is pinned. Round three
+ * (figures/clock) shows that this fit blends a saturating input-side code with a roughly fractional
+ * answer-side one; the input side cannot be fractional under the causal mask.
  */
 
 import { useEffect, useMemo, useState } from "react";
